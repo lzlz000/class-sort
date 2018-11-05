@@ -485,13 +485,11 @@ var startGA = function() {
     
     initclassMatrixes();
     
-    debugger;
-
     // 执行遗传算法
     ga();
 
     // 渲染视图
-    // draw(resultData);
+    draw();
 }
 //startGA(100, 10, 100, 100, 0.2);
 
@@ -1133,14 +1131,14 @@ function mutation(crossRoomMatrixes, crossClassMatrixes) {
  * 渲染视图
  * @param resultData
  */
-function draw(resultData) {
+function draw() {
 // 基于准备好的dom，初始化echarts实例
     var myChart = echarts.init(document.getElementById('main'));
 
     // 指定图表的配置项和数据
     var option = {
         title: {
-            text: '基于遗传算法的负载均衡调度策略'
+            text: '基于遗传算法的自动排课'
         },
         tooltip : {
             trigger: 'axis',
@@ -1179,7 +1177,7 @@ function draw(resultData) {
             {
                 type : 'value',
                 scale:true,
-                name: '任务处理时间'
+                name: '适应度'
             }
         ],
         series : [
@@ -1192,7 +1190,7 @@ function draw(resultData) {
                     var d = [];
                     for (var itIndex=0; itIndex<iteratorNum; itIndex++) {
                         for (var chromosomeIndex=0; chromosomeIndex<chromosomeNum; chromosomeIndex++) {
-                            d.push([itIndex, resultData[itIndex][chromosomeIndex]]);
+                            d.push([itIndex, parseInt(logGenData[itIndex][chromosomeIndex])]);
                         }
                     }
                     return d;
@@ -1203,4 +1201,147 @@ function draw(resultData) {
 
     // 使用刚指定的配置项和数据显示图表。
     myChart.setOption(option);
+
+    // 绘制迭代数据表
+    drawIterTable();
 }
+
+var iterSel = {iterIndex:0, chromosomeIndex:0};
+function drawIterTable() {
+    var tableData = [];
+    for (var itIndex=0; itIndex<iteratorNum; itIndex++) {
+        var rowData = {iterNO: itIndex+1};
+        for (var chromosomeIndex=0; chromosomeIndex<chromosomeNum; chromosomeIndex++) {
+            rowData[(chromosomeIndex+1).toString()] = parseInt(logGenData[itIndex][chromosomeIndex]);
+        }
+        tableData.push(rowData);
+    }
+    var colNames = ["迭代次数"];
+    var colModel = [{name:'iterNO',index:'iterNO'}];
+    for (var chromosomeIndex=0; chromosomeIndex<chromosomeNum; chromosomeIndex++) {
+        colNames[chromosomeIndex+1] = "染"+(chromosomeIndex+1);
+        colModel.push({
+            name: (chromosomeIndex+1).toString(),
+            index: (chromosomeIndex+1).toString()
+        });
+    }
+
+    $("#iterTable").jqGrid({
+        data: tableData,//当 datatype 为"local" 时需填写
+        datatype: "local", //数据来源，本地数据（local，json,jsonp,xml等）
+        height: 250,//高度，表格高度。可为数值、百分比或'auto'
+        colNames: colNames,
+        colModel : colModel,
+        viewrecords: true,//是否在浏览导航栏显示记录总数
+        rowNum: 20,//每页显示记录数
+        rowList: [10, 20, 30],//用于改变显示行数的下拉列表框的元素数组。
+        pager: "#iterNav",//分页、按钮所在的浏览导航栏
+        altRows: true,//设置为交替行表格,默认为false
+        //toppager: true,//是否在上面显示浏览导航栏
+        //multiselect: true,//是否多选
+        //multikey: "ctrlKey",//是否只能用Ctrl按键多选
+        //multiboxonly: true,//是否只能点击复选框多选
+        //subGrid : true,
+        //sortname:'id',//默认的排序列名
+        //sortorder:'asc',//默认的排序方式（asc升序，desc降序）
+        caption: "迭代数据一览",//表名
+        autowidth: true, //自动宽
+        cellEdit: true,
+        onSelectRow: function(id){
+        },
+        onCellSelect: function (rowid, iCol, cellcontent, e) {
+            iterSel.iterIndex = rowid - 1;
+            iterSel.chromosomeIndex = iCol -1;
+            console.log(rowid + "," + iCol + "," + cellcontent);
+
+            drawClassRoomTable(iterSel.iterIndex, iterSel.chromosomeIndex);
+        }
+        
+    });
+}
+
+$("#classRoomSel").change(function () {
+    drawClassRoomTable(iterSel.iterIndex, iterSel.chromosomeIndex);
+});
+
+function drawClassRoomTable(iterIntex, chromosomeIndex) {
+    var classRoomIndex = $("#classRoomSel").val();
+    var roomData = [];
+
+    for (var t=0; t<times.length; t++) {
+        var row = {secNO: t+1};
+        for (var d=0; d<days.length; d++) {
+            var classNO = chromosomeMatrix[chromosomeIndex][classRoomIndex][d][t];
+            if (classNO > -1) {
+                row[d+1] = classes[classNO].id + ":" + coursesMap[classes[classNO].course].name;
+            } else {
+                row[d+1] = "";
+            }
+        }
+        roomData.push(row);
+    }
+
+    $("#classRoomTable").jqGrid("clearGridData");
+    $("#classRoomTable").jqGrid('setGridParam', {
+        data: roomData,//当 datatype 为"local" 时需填写
+        datatype: "local", //数据来源，本地数据（local，json,jsonp,xml等）
+        page:1
+    }).trigger("reloadGrid");
+}
+
+function drawClassTable() {
+    
+}
+
+function initSelectText() {
+    for (var c=0; c<classRooms.length; c++) {
+        $("#classRoomSel").append("<option value=" + c + ">" + classRooms[c].id + "</option>");
+    }
+    var roomData = [];
+    for (var t=0; t<times.length; t++) {
+        var row = {secNO: t+1};
+        for (var d=0; d<days.length; d++) {
+            row[d+1] = "";
+        }
+        roomData.push(row);
+    }
+    var colNames = ["节次"];
+    var colModel = [{name:'secNO',index:'secNO'}];
+    for (var d=0; d<days.length; d++) {
+        colNames[d+1] = "星期"+(d+1);
+        colModel.push({
+            name: (d+1).toString(),
+            index: (d+1).toString()
+        });
+    }
+    $("#classRoomTable").jqGrid({
+        data: roomData,//当 datatype 为"local" 时需填写
+        datatype: "local", //数据来源，本地数据（local，json,jsonp,xml等）
+        height: 300,//高度，表格高度。可为数值、百分比或'auto'
+        colNames: colNames,
+        colModel: colModel,
+        viewrecords: true,//是否在浏览导航栏显示记录总数
+        rowNum: 20,//每页显示记录数
+        rowList: [10, 20, 30],//用于改变显示行数的下拉列表框的元素数组。
+        pager: "#classRoomNav",//分页、按钮所在的浏览导航栏
+        altRows: true,//设置为交替行表格,默认为false
+        //toppager: true,//是否在上面显示浏览导航栏
+        //multiselect: true,//是否多选
+        //multikey: "ctrlKey",//是否只能用Ctrl按键多选
+        //multiboxonly: true,//是否只能点击复选框多选
+        //subGrid : true,
+        //sortname:'id',//默认的排序列名
+        //sortorder:'asc',//默认的排序方式（asc升序，desc降序）
+        caption: "教室课表",//表名
+        autowidth: true//自动宽
+    });
+
+
+    for (var d=0; d<classes.length; d++) {
+        $("#classSel").append("<option value=" + d + ">" + classes[d].id + "</option>");
+    }
+}
+
+window.onload = function () {
+    initSelectText();
+};
