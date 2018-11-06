@@ -27,9 +27,9 @@ var unitTimeStart = {
 var daySels = [1,4,3,5,2,6];
 
 /** 校区 */
-var Zone = {SP:0, JD:1};
+var Zone = {SP:'SP', JD:'JD'};
 /** 教室类别 */
-var RoomType = {NORMAL:0, COMPUTER:1, PLAYGROUD:2, LAB:3, MEDIA:4};
+var RoomType = {NORMAL:'normal', COMPUTER:'computer', PLAYGROUD:'playgroud', LAB:'lab', MEDIA:'media'};
 
 /** 教学楼  zone-校区 floors-楼层数（0为操场）*/
 var buildings = [
@@ -449,6 +449,9 @@ function initMapCaches() {
     });
     classes.forEach(function(_class, index) {
         classesMap[_class.id] = _class;
+    });
+    teachers.forEach(function (teacher, index) {
+        teachersMap[teacher.id] = teacher;
     });
     buildings.forEach(function(building, index) {
         buildingsMap[building.id] = building;
@@ -1255,17 +1258,27 @@ function drawIterTable() {
             console.log(rowid + "," + iCol + "," + cellcontent);
 
             drawClassRoomTable(iterSel.iterIndex, iterSel.chromosomeIndex);
+            drawClassTable(iterSel.iterIndex, iterSel.chromosomeIndex);
         }
-        
     });
+
+    drawClassRoomTable(iterSel.iterIndex, iterSel.chromosomeIndex);
+    drawClassTable(iterSel.iterIndex, iterSel.chromosomeIndex);
 }
 
 $("#classRoomSel").change(function () {
     drawClassRoomTable(iterSel.iterIndex, iterSel.chromosomeIndex);
 });
+$("#classSel").change(function () {
+    drawClassTable(iterSel.iterIndex, iterSel.chromosomeIndex);
+});
 
 function drawClassRoomTable(iterIntex, chromosomeIndex) {
     var classRoomIndex = $("#classRoomSel").val();
+    var room = classRooms[classRoomIndex];
+    var build = buildingsMap[room.building];
+    var caption = "教室课表 " + room.id + ":" + room.roomNO + "/" + room.capacity + "/" + room.roomType + "/" + build.zone;
+
     var roomData = [];
 
     for (var t=0; t<times.length; t++) {
@@ -1282,6 +1295,7 @@ function drawClassRoomTable(iterIntex, chromosomeIndex) {
     }
 
     $("#classRoomTable").jqGrid("clearGridData");
+    $("#classRoomTable").jqGrid("setCaption", caption);
     $("#classRoomTable").jqGrid('setGridParam', {
         data: roomData,//当 datatype 为"local" 时需填写
         datatype: "local", //数据来源，本地数据（local，json,jsonp,xml等）
@@ -1289,8 +1303,45 @@ function drawClassRoomTable(iterIntex, chromosomeIndex) {
     }).trigger("reloadGrid");
 }
 
-function drawClassTable() {
-    
+function drawClassTable(iterIntex, chromosomeIndex) {
+    var classIndex = $("#classSel").val();
+    var classObj = classes[classIndex];
+    var course = coursesMap[classObj.course];
+    var teacher = teachersMap[classObj.teacher];
+    var caption = "教学班课表 " + classObj.id + ":" + course.name + "/" + teacher.name + "/" + classObj.studentNum;
+
+    var classData = [];
+
+    var timeObjArr = [];
+    var classTimesArr = classMatrixes[chromosomeIndex][classIndex];
+    classTimesArr.forEach(function (timeStr, index) {
+        timeObjArr.push(decodeTimeCode(timeStr));
+    });
+
+    for (var t=0; t<times.length; t++) {
+        var row = {secNO: t+1};
+        for (var d=0; d<days.length; d++) {
+            var timeObj = timeObjArr.filter(function (obj) {
+                return (obj.timeNO == t) && (obj.dayNO == d);
+            });
+            if (timeObj && timeObj.length > 0) {
+                var room = classRooms[timeObj[0].classRoomNO];
+                var build = buildingsMap[room.building];
+                row[d+1] = room.id + ":" + room.roomNO + "/" + room.capacity + "/" + room.roomType + "/" + build.zone;
+            } else {
+                row[d+1] = "";
+            }
+        }
+        classData.push(row);
+    }
+
+    $("#classTable").jqGrid("clearGridData");
+    $("#classTable").jqGrid("setCaption", caption);
+    $("#classTable").jqGrid('setGridParam', {
+        data: classData,//当 datatype 为"local" 时需填写
+        datatype: "local", //数据来源，本地数据（local，json,jsonp,xml等）
+        page:1
+    }).trigger("reloadGrid");
 }
 
 function initSelectText() {
@@ -1340,6 +1391,35 @@ function initSelectText() {
     for (var d=0; d<classes.length; d++) {
         $("#classSel").append("<option value=" + d + ">" + classes[d].id + "</option>");
     }
+    var classData = [];
+    for (var t=0; t<times.length; t++) {
+        var row = {secNO: t+1};
+        for (var d=0; d<days.length; d++) {
+            row[d+1] = "";
+        }
+        classData.push(row);
+    }
+    $("#classTable").jqGrid({
+        data: classData,//当 datatype 为"local" 时需填写
+        datatype: "local", //数据来源，本地数据（local，json,jsonp,xml等）
+        height: 300,//高度，表格高度。可为数值、百分比或'auto'
+        colNames: colNames,
+        colModel: colModel,
+        viewrecords: true,//是否在浏览导航栏显示记录总数
+        rowNum: 20,//每页显示记录数
+        rowList: [10, 20, 30],//用于改变显示行数的下拉列表框的元素数组。
+        pager: "#classNav",//分页、按钮所在的浏览导航栏
+        altRows: true,//设置为交替行表格,默认为false
+        //toppager: true,//是否在上面显示浏览导航栏
+        //multiselect: true,//是否多选
+        //multikey: "ctrlKey",//是否只能用Ctrl按键多选
+        //multiboxonly: true,//是否只能点击复选框多选
+        //subGrid : true,
+        //sortname:'id',//默认的排序列名
+        //sortorder:'asc',//默认的排序方式（asc升序，desc降序）
+        caption: "教学班课表",//表名
+        autowidth: true//自动宽
+    });
 }
 
 window.onload = function () {
