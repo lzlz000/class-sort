@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>遗传算法</title>
+    <link rel="stylesheet" type="text/css" href="lib/jquery-ui-custom.css" />
+    <link rel="stylesheet" type="text/css" href="lib/ui.jqgrid.css" />
+    <link rel="stylesheet" type="text/css" media="screen" href="lib/jquery.searchFilter.css" />
+</head>
+<body>
+<div>
+    <button onclick="startGA()">执行排课算法</button>
+    <button onclick="coverData()">覆盖初始数据</button>
+</div>
+<!-- 为ECharts准备一个具备大小（宽高）的Dom -->
+<div id="main" style="width: 100%;height:400px;"></div>
+<div>
+    <div>
+        <div id="iterDiv">
+            <table id="iterTable"></table>
+            <div id="iterNav"></div>
+        </div>
+    </div>
+    <div>
+        <span>教室课表：</span>
+        <select id="classRoomSel"></select>
+        <div id="classRoomDiv">
+            <table id="classRoomTable"></table>
+            <div id="classRoomNav"></div>
+        </div>
+    </div>
+    <div>
+        <span>教学班课表：</span>
+        <select id="classSel"></select>
+        <div id="classDiv">
+            <table id="classTable"></table>
+            <div id="classNav"></div>
+        </div>
+    </div>
+</div>
+
+<script src="lib/echarts.min.js"></script>
+<script src="lib/jquery-1.11.0.min.js"></script>
+<script src="lib/jquery.jqGrid.min.js"></script>
+<script src="lib/grid.locale-cn.js"></script>
+<script src="common.js"></script>
+<script src="GA.data.js"></script>
+<script src="data.js"></script>
+</body>
+</html>

@@ -13,8 +13,8 @@ TimeUnit.prototype.toString = function () {
 };
 
 
-function log(msg) {
-    if (gEnableLog) {
+function log(msg,force) {
+    if (gEnableLog || force) {
         console.log(msg);
     }
 }
