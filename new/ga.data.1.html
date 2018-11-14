@@ -3,14 +3,21 @@
 <head>
     <meta charset="UTF-8">
     <title>遗传算法</title>
-    <link rel="stylesheet" type="text/css" href="lib/jquery-ui-custom.css" />
-    <link rel="stylesheet" type="text/css" href="lib/ui.jqgrid.css" />
-    <link rel="stylesheet" type="text/css" media="screen" href="lib/jquery.searchFilter.css" />
+    <link rel="stylesheet" type="text/css" href="../lib/jquery-ui-custom.css" />
+    <link rel="stylesheet" type="text/css" href="../lib/ui.jqgrid.css" />
 </head>
 <body>
 <div>
-    <button onclick="startGA()">执行排课算法</button>
-    <button onclick="coverData()">覆盖初始数据</button>
+    <button onclick="main()">执行排课算法</button> 
+    <button onclick="coverData()">覆盖初始数据</button> 
+    <label>log
+        <select onchange="logger.setLevel(this.value)"> 
+            <option value="0">DEBUG</option>
+            <option value="1" selected>INFO</option>
+            <option value="2">NONE</option>
+        </select>
+    </label>
+   
 </div>
 <!-- 为ECharts准备一个具备大小（宽高）的Dom -->
 <div id="main" style="width: 100%;height:400px;"></div>
@@ -38,29 +45,34 @@
         </div>
     </div>
 </div>
+<script src="../lib/echarts.min.js"></script>
+<script src="../lib/jquery-1.11.0.min.js"></script>
+<script src="../lib/jquery.jqGrid.min.js"></script>
+<script src="../lib/grid.locale-cn.js"></script>
+<script src="./common1.js"></script>
+<script src="./data.js"></script>
+<script src="./GA1.js"></script>
+<script src="./view.js"></script>
 
-<script src="lib/echarts.min.js"></script>
-<script src="lib/jquery-1.11.0.min.js"></script>
-<script src="lib/jquery.jqGrid.min.js"></script>
-<script src="lib/grid.locale-cn.js"></script>
-<script src="common.js"></script>
-<script src="GA.data.js"></script>
-<script src="data.js"></script>
 <script>
 /**
  * 渲染视图
  * @param resultData
  */
  function draw() {
+    initSelectText();
 // 基于准备好的dom，初始化echarts实例
     var myChart = echarts.init(document.getElementById('main'));
-
     // 指定图表的配置项和数据
     var option = {
         title: {
             text: '基于遗传算法的自动排课'
         },
         tooltip : {
+            position:function(position){
+                //获取容器的宽度
+                return [position[0]+10, position[1]+10];
+            },
             trigger: 'axis',
             showDelay : 0,
             axisPointer:{
@@ -74,7 +86,7 @@
             zlevel: 1
         },
         legend: {
-            data:['遗传算法']
+            data:['染色体适应度']
         },
         toolbox: {
             show : true,
@@ -102,14 +114,14 @@
         ],
         series : [
             {
-                name:'遗传算法',
+                name:'染色体适应度',
                 type:'scatter',
                 large: true,
                 symbolSize: 3,
                 data: (function () {
                     var d = [];
-                    for (var itIndex=0; itIndex<iteratorNum; itIndex++) {
-                        for (var chromosomeIndex=0; chromosomeIndex<chromosomeNum; chromosomeIndex++) {
+                    for (var itIndex=0; itIndex<CONFIG.iteratorNum; itIndex++) {
+                        for (var chromosomeIndex=0; chromosomeIndex<CONFIG.chromosomeNum; chromosomeIndex++) {
                             d.push([itIndex, parseInt(logGenData[itIndex][chromosomeIndex])]);
                         }
                     }
@@ -129,16 +141,16 @@
 var iterSel = {iterIndex:0, chromosomeIndex:0};
 function drawIterTable() {
     var tableData = [];
-    for (var itIndex=0; itIndex<iteratorNum; itIndex++) {
+    for (var itIndex=0; itIndex<CONFIG.iteratorNum; itIndex++) {
         var rowData = {iterNO: itIndex+1};
-        for (var chromosomeIndex=0; chromosomeIndex<chromosomeNum; chromosomeIndex++) {
+        for (var chromosomeIndex=0; chromosomeIndex<CONFIG.chromosomeNum; chromosomeIndex++) {
             rowData[(chromosomeIndex+1).toString()] = parseInt(logGenData[itIndex][chromosomeIndex]);
         }
         tableData.push(rowData);
     }
     var colNames = ["迭代次数"];
     var colModel = [{name:'iterNO',index:'iterNO'}];
-    for (var chromosomeIndex=0; chromosomeIndex<chromosomeNum; chromosomeIndex++) {
+    for (var chromosomeIndex=0; chromosomeIndex<CONFIG.chromosomeNum; chromosomeIndex++) {
         colNames[chromosomeIndex+1] = "染"+(chromosomeIndex+1);
         colModel.push({
             name: (chromosomeIndex+1).toString(),
@@ -198,12 +210,12 @@ function drawClassRoomTable(iterIntex, chromosomeIndex) {
 
     var roomData = [];
 
-    for (var t=0; t<times.length; t++) {
+    for (var t=0; t<TIMES; t++) {
         var row = {secNO: t+1};
-        for (var d=0; d<days.length; d++) {
+        for (var d=0; d<DAYS; d++) {
             var classNO = chromosomeMatrix[chromosomeIndex][classRoomIndex][d][t];
             if (classNO > -1) {
-                row[d+1] = classes[classNO].id + ":" + coursesMap[classes[classNO].course].name;
+                row[d+1] = lessons[classNO].id + ":" + coursesMap[lessons[classNO].course].name;
             } else {
                 row[d+1] = "";
             }
@@ -222,7 +234,7 @@ function drawClassRoomTable(iterIntex, chromosomeIndex) {
 
 function drawClassTable(iterIntex, chromosomeIndex) {
     var classIndex = $("#classSel").val();
-    var classObj = classes[classIndex];
+    var classObj = lessons[classIndex];
     var course = coursesMap[classObj.course];
     var teacher = teachersMap[classObj.teacher];
     var caption = "教学班课表 " + classObj.id + ":" + course.name + "/" + teacher.name + "/" + classObj.studentNum;
@@ -235,9 +247,9 @@ function drawClassTable(iterIntex, chromosomeIndex) {
         timeObjArr.push(decodeTimeCode(timeStr));
     });
 
-    for (var t=0; t<times.length; t++) {
+    for (var t=0; t<TIMES; t++) {
         var row = {secNO: t+1};
-        for (var d=0; d<days.length; d++) {
+        for (var d=0; d<DAYS; d++) {
             var timeObj = timeObjArr.filter(function (obj) {
                 return (obj.timeNO == t) && (obj.dayNO == d);
             });
@@ -262,20 +274,22 @@ function drawClassTable(iterIntex, chromosomeIndex) {
 }
 
 function initSelectText() {
+    let $classRoomSel = $("#classRoomSel");
+    $classRoomSel.html('');
     for (var c=0; c<classRooms.length; c++) {
-        $("#classRoomSel").append("<option value=" + c + ">" + classRooms[c].id + "</option>");
+        $classRoomSel.append("<option value=" + c + ">" + classRooms[c].id + "</option>");
     }
     var roomData = [];
-    for (var t=0; t<times.length; t++) {
+    for (var t=0; t<TIMES; t++) {
         var row = {secNO: t+1};
-        for (var d=0; d<days.length; d++) {
+        for (var d=0; d<DAYS; d++) {
             row[d+1] = "";
         }
         roomData.push(row);
     }
     var colNames = ["节次"];
     var colModel = [{name:'secNO',index:'secNO'}];
-    for (var d=0; d<days.length; d++) {
+    for (var d=0; d<DAYS; d++) {
         colNames[d+1] = "星期"+(d+1);
         colModel.push({
             name: (d+1).toString(),
@@ -305,13 +319,13 @@ function initSelectText() {
     });
 
 
-    for (var d=0; d<classes.length; d++) {
-        $("#classSel").append("<option value=" + d + ">" + classes[d].id + "</option>");
+    for (var d=0; d<lessons.length; d++) {
+        $("#classSel").append("<option value=" + d + ">" + lessons[d].id + "</option>");
     }
     var classData = [];
-    for (var t=0; t<times.length; t++) {
+    for (var t=0; t<TIMES; t++) {
         var row = {secNO: t+1};
-        for (var d=0; d<days.length; d++) {
+        for (var d=0; d<DAYS; d++) {
             row[d+1] = "";
         }
         classData.push(row);
@@ -338,10 +352,6 @@ function initSelectText() {
         autowidth: true//自动宽
     });
 }
-
-window.onload = function () {
-    initSelectText();
-};
 </script>
 </body>
 </html>

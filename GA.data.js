@@ -59,7 +59,7 @@ var classroomsMap = {};
 
 /** 教学班
  */ 
-var classes = [
+var lessons = [
     {id:30101, course:10001, teacher:20001, studentNum:28, zone:Zone.SP},
     {id:30102, course:10001, teacher:20001, studentNum:28, zone:Zone.JD},
     {id:30201, course:10002, teacher:20002, studentNum:90, zone:Zone.SP},
@@ -146,11 +146,11 @@ var neceReq = [
             if (!existClassNO || existClassNO == classNO) {
                 continue;
             }
-            if (!classes[existClassNO] || !classes[classNO]) {
+            if (!lessons[existClassNO] || !lessons[classNO]) {
                 continue;
             }
             
-            if (classes[existClassNO].teacher == classes[classNO].teacher) {
+            if (lessons[existClassNO].teacher == lessons[classNO].teacher) {
                 matchable = false;
                 break;
             }
@@ -164,7 +164,7 @@ var neceReq = [
         //log('nece-func-2: 某一教室的某一时间片只能被一门课程占用: ' + classRoomNO + ',' + dayNO + ',' + timeNO + ',' + classNO);
         var matchable = true;
         var existClassNO = roomMatrix[classRoomNO][dayNO][timeNO];
-        if(existClassNO && classes[existClassNO] && existClassNO != classNO) {
+        if(existClassNO && lessons[existClassNO] && existClassNO != classNO) {
             matchable = false;
         }
         if (!matchable) {
@@ -180,7 +180,7 @@ var neceReq = [
             if (!existClassNO || existClassNO == classNO) {
                 continue;
             }
-            if (!classes[existClassNO] || !classes[classNO]) {
+            if (!lessons[existClassNO] || !lessons[classNO]) {
                 continue;
             }
             
@@ -197,7 +197,7 @@ var neceReq = [
     function(roomMatrix, classMatrix, classRoomNO, dayNO, timeNO, classNO) {
         //log('nece-func-4: 某课程m必须安排在预定的时间片n上: ' + classRoomNO + ',' + dayNO + ',' + timeNO + ',' + classNO);
         var matchable = true;
-        var classSel = classes[classNO];
+        var classSel = lessons[classNO];
         if (classSel && classSel.timeRequire) {
             if (classSel.timeRequire.day) {
                 var dayFilter = classSel.timeRequire.day.filter(function (day) {
@@ -241,7 +241,7 @@ var neceReq = [
                 }
             }
         }
-        matchable = (dayHourCnt < coursesMap[classes[classNO].course].onceHour);
+        matchable = (dayHourCnt < coursesMap[lessons[classNO].course].onceHour);
         if (!matchable) {
             log('[UnMatch]nece-func-6: 同一教学班任务不要在同一天内连续的开课: ' + classRoomNO + ',' + dayNO + ',' + timeNO + ',' + classNO);
         }
@@ -251,11 +251,11 @@ var neceReq = [
         //log('nece-func-7: 课程对教室的要求: ' + classRoomNO + ',' + dayNO + ',' + timeNO + ',' + classNO);
         var matchable = true;
         var classRoom = classRooms[classRoomNO];
-        var course = coursesMap[classes[classNO].course];
+        var course = coursesMap[lessons[classNO].course];
         // 匹配教室类型，容量，校区
         matchable = (classRoom.roomType == course.roomType) 
-            && (classes[classNO].studentNum <= classRoom.capacity)
-            && (buildingsMap[classRoom.building].zone == classes[classNO].zone);
+            && (lessons[classNO].studentNum <= classRoom.capacity)
+            && (buildingsMap[classRoom.building].zone == lessons[classNO].zone);
         if (!matchable) {
             log('[UnMatch]nece-func-7: 课程对教室的要求: ' + classRoomNO + ',' + dayNO + ',' + timeNO + ',' + classNO);
         }
@@ -285,7 +285,7 @@ var neceReq = [
 var possReq = [
     function(roomMatrix, classMatrix, classRoomNO, dayNO, timeNO, classNO) {
         var suitVal = 0;
-        var rate = classes[classNO].studentNum / classRooms[classRoomNO].capacity;
+        var rate = lessons[classNO].studentNum / classRooms[classRoomNO].capacity;
         
         // 比值越接近1，适应度越高: rate*100
         suitVal = rate * 100;
@@ -335,12 +335,12 @@ var possReq = [
     function(roomMatrix, classMatrix, classRoomNO, dayNO, timeNO, classNO) {
         var suitVal = 0;
         var classNO = roomMatrix[classRoomNO][dayNO][timeNO];
-        var classObj = classes[classNO];
+        var classObj = lessons[classNO];
         var classRoom = classRooms[classRoomNO];
         
         // 遍历课程所属老师
         for (var c=0; c<classMatrix.length; c++) {
-            if (classes[c].teacher && classes[c].teacher == classObj.teacher && c!=classNO) {
+            if (lessons[c].teacher && lessons[c].teacher == classObj.teacher && c!=classNO) {
                 var classTimeArr = classMatrix[c];
                 for (var i=0; i<classTimeArr.length; i++) {
                     var timeObj = decodeTimeCode(classTimeArr[i]);
@@ -436,7 +436,7 @@ function initChromosomeMatrix() {
 function initclassMatrixes() {
     for (var cms=0; cms<chromosomeNum; cms++) {
         classMatrixes[cms] = [];
-        for (var c=0; c<classes.length; c++) {
+        for (var c=0; c<lessons.length; c++) {
             classMatrixes[cms][c] = [];
         }
     }
@@ -447,7 +447,7 @@ function initMapCaches() {
     courses.forEach(function(course, index) {
         coursesMap[course.id] = course;
     });
-    classes.forEach(function(_class, index) {
+    lessons.forEach(function(_class, index) {
         classesMap[_class.id] = _class;
     });
     teachers.forEach(function (teacher, index) {
@@ -516,8 +516,8 @@ function ga() {
  */
 function initGeneration(roomMatrix, classMatrix) {
     // 遍历的是教学班，随机选择教室
-    for (var classNO=0; classNO<classes.length; classNO++) {
-        var classObj = classes[classNO];
+    for (var classNO=0; classNO<lessons.length; classNO++) {
+        var classObj = lessons[classNO];
         var course = coursesMap[classObj.course];
         
         // 联排起始节次
@@ -1078,7 +1078,7 @@ function mutation(crossRoomMatrixes, crossClassMatrixes) {
             break;
         }
         var classNO = classRandArr[cIndex] - 1;
-        var classObj = classes[classNO];
+        var classObj = lessons[classNO];
         var course = coursesMap[classObj.course];
 
         // 联排起始节次
@@ -1129,299 +1129,3 @@ function mutation(crossRoomMatrixes, crossClassMatrixes) {
 
     return mutationIndexArr;
 }
-
-/**
- * 渲染视图
- * @param resultData
- */
-function draw() {
-// 基于准备好的dom，初始化echarts实例
-    var myChart = echarts.init(document.getElementById('main'));
-
-    // 指定图表的配置项和数据
-    var option = {
-        title: {
-            text: '基于遗传算法的自动排课'
-        },
-        tooltip : {
-            trigger: 'axis',
-            showDelay : 0,
-            axisPointer:{
-                show: true,
-                type : 'cross',
-                lineStyle: {
-                    type : 'dashed',
-                    width : 1
-                }
-            },
-            zlevel: 1
-        },
-        legend: {
-            data:['遗传算法']
-        },
-        toolbox: {
-            show : true,
-            feature : {
-                mark : {show: true},
-                dataZoom : {show: true},
-                dataView : {show: true, readOnly: false},
-                restore : {show: true},
-                saveAsImage : {show: true}
-            }
-        },
-        xAxis : [
-            {
-                type : 'value',
-                scale:true,
-                name: '迭代次数'
-            }
-        ],
-        yAxis : [
-            {
-                type : 'value',
-                scale:true,
-                name: '适应度'
-            }
-        ],
-        series : [
-            {
-                name:'遗传算法',
-                type:'scatter',
-                large: true,
-                symbolSize: 3,
-                data: (function () {
-                    var d = [];
-                    for (var itIndex=0; itIndex<iteratorNum; itIndex++) {
-                        for (var chromosomeIndex=0; chromosomeIndex<chromosomeNum; chromosomeIndex++) {
-                            d.push([itIndex, parseInt(logGenData[itIndex][chromosomeIndex])]);
-                        }
-                    }
-                    return d;
-                })()
-            }
-        ]
-    };
-
-    // 使用刚指定的配置项和数据显示图表。
-    myChart.setOption(option);
-
-    // 绘制迭代数据表
-    drawIterTable();
-}
-
-var iterSel = {iterIndex:0, chromosomeIndex:0};
-function drawIterTable() {
-    var tableData = [];
-    for (var itIndex=0; itIndex<iteratorNum; itIndex++) {
-        var rowData = {iterNO: itIndex+1};
-        for (var chromosomeIndex=0; chromosomeIndex<chromosomeNum; chromosomeIndex++) {
-            rowData[(chromosomeIndex+1).toString()] = parseInt(logGenData[itIndex][chromosomeIndex]);
-        }
-        tableData.push(rowData);
-    }
-    var colNames = ["迭代次数"];
-    var colModel = [{name:'iterNO',index:'iterNO'}];
-    for (var chromosomeIndex=0; chromosomeIndex<chromosomeNum; chromosomeIndex++) {
-        colNames[chromosomeIndex+1] = "染"+(chromosomeIndex+1);
-        colModel.push({
-            name: (chromosomeIndex+1).toString(),
-            index: (chromosomeIndex+1).toString()
-        });
-    }
-
-    $("#iterTable").jqGrid({
-        data: tableData,//当 datatype 为"local" 时需填写
-        datatype: "local", //数据来源，本地数据（local，json,jsonp,xml等）
-        height: 250,//高度，表格高度。可为数值、百分比或'auto'
-        colNames: colNames,
-        colModel : colModel,
-        viewrecords: true,//是否在浏览导航栏显示记录总数
-        rowNum: 20,//每页显示记录数
-        rowList: [10, 20, 30],//用于改变显示行数的下拉列表框的元素数组。
-        pager: "#iterNav",//分页、按钮所在的浏览导航栏
-        altRows: true,//设置为交替行表格,默认为false
-        //toppager: true,//是否在上面显示浏览导航栏
-        //multiselect: true,//是否多选
-        //multikey: "ctrlKey",//是否只能用Ctrl按键多选
-        //multiboxonly: true,//是否只能点击复选框多选
-        //subGrid : true,
-        //sortname:'id',//默认的排序列名
-        //sortorder:'asc',//默认的排序方式（asc升序，desc降序）
-        caption: "迭代数据一览",//表名
-        autowidth: true, //自动宽
-        cellEdit: true,
-        onSelectRow: function(id){
-        },
-        onCellSelect: function (rowid, iCol, cellcontent, e) {
-            iterSel.iterIndex = rowid - 1;
-            iterSel.chromosomeIndex = iCol -1;
-            console.log(rowid + "," + iCol + "," + cellcontent);
-
-            drawClassRoomTable(iterSel.iterIndex, iterSel.chromosomeIndex);
-            drawClassTable(iterSel.iterIndex, iterSel.chromosomeIndex);
-        }
-    });
-
-    drawClassRoomTable(iterSel.iterIndex, iterSel.chromosomeIndex);
-    drawClassTable(iterSel.iterIndex, iterSel.chromosomeIndex);
-}
-
-$("#classRoomSel").change(function () {
-    drawClassRoomTable(iterSel.iterIndex, iterSel.chromosomeIndex);
-});
-$("#classSel").change(function () {
-    drawClassTable(iterSel.iterIndex, iterSel.chromosomeIndex);
-});
-
-function drawClassRoomTable(iterIntex, chromosomeIndex) {
-    var classRoomIndex = $("#classRoomSel").val();
-    var room = classRooms[classRoomIndex];
-    var build = buildingsMap[room.building];
-    var caption = "教室课表 " + room.id + ":" + room.roomNO + "/" + room.capacity + "/" + room.roomType + "/" + build.zone;
-
-    var roomData = [];
-
-    for (var t=0; t<times.length; t++) {
-        var row = {secNO: t+1};
-        for (var d=0; d<days.length; d++) {
-            var classNO = chromosomeMatrix[chromosomeIndex][classRoomIndex][d][t];
-            if (classNO > -1) {
-                row[d+1] = classes[classNO].id + ":" + coursesMap[classes[classNO].course].name;
-            } else {
-                row[d+1] = "";
-            }
-        }
-        roomData.push(row);
-    }
-
-    $("#classRoomTable").jqGrid("clearGridData");
-    $("#classRoomTable").jqGrid("setCaption", caption);
-    $("#classRoomTable").jqGrid('setGridParam', {
-        data: roomData,//当 datatype 为"local" 时需填写
-        datatype: "local", //数据来源，本地数据（local，json,jsonp,xml等）
-        page:1
-    }).trigger("reloadGrid");
-}
-
-function drawClassTable(iterIntex, chromosomeIndex) {
-    var classIndex = $("#classSel").val();
-    var classObj = classes[classIndex];
-    var course = coursesMap[classObj.course];
-    var teacher = teachersMap[classObj.teacher];
-    var caption = "教学班课表 " + classObj.id + ":" + course.name + "/" + teacher.name + "/" + classObj.studentNum;
-
-    var classData = [];
-
-    var timeObjArr = [];
-    var classTimesArr = classMatrixes[chromosomeIndex][classIndex];
-    classTimesArr.forEach(function (timeStr, index) {
-        timeObjArr.push(decodeTimeCode(timeStr));
-    });
-
-    for (var t=0; t<times.length; t++) {
-        var row = {secNO: t+1};
-        for (var d=0; d<days.length; d++) {
-            var timeObj = timeObjArr.filter(function (obj) {
-                return (obj.timeNO == t) && (obj.dayNO == d);
-            });
-            if (timeObj && timeObj.length > 0) {
-                var room = classRooms[timeObj[0].classRoomNO];
-                var build = buildingsMap[room.building];
-                row[d+1] = room.id + ":" + room.roomNO + "/" + room.capacity + "/" + room.roomType + "/" + build.zone;
-            } else {
-                row[d+1] = "";
-            }
-        }
-        classData.push(row);
-    }
-
-    $("#classTable").jqGrid("clearGridData");
-    $("#classTable").jqGrid("setCaption", caption);
-    $("#classTable").jqGrid('setGridParam', {
-        data: classData,//当 datatype 为"local" 时需填写
-        datatype: "local", //数据来源，本地数据（local，json,jsonp,xml等）
-        page:1
-    }).trigger("reloadGrid");
-}
-
-function initSelectText() {
-    for (var c=0; c<classRooms.length; c++) {
-        $("#classRoomSel").append("<option value=" + c + ">" + classRooms[c].id + "</option>");
-    }
-    var roomData = [];
-    for (var t=0; t<times.length; t++) {
-        var row = {secNO: t+1};
-        for (var d=0; d<days.length; d++) {
-            row[d+1] = "";
-        }
-        roomData.push(row);
-    }
-    var colNames = ["节次"];
-    var colModel = [{name:'secNO',index:'secNO'}];
-    for (var d=0; d<days.length; d++) {
-        colNames[d+1] = "星期"+(d+1);
-        colModel.push({
-            name: (d+1).toString(),
-            index: (d+1).toString()
-        });
-    }
-    $("#classRoomTable").jqGrid({
-        data: roomData,//当 datatype 为"local" 时需填写
-        datatype: "local", //数据来源，本地数据（local，json,jsonp,xml等）
-        height: 300,//高度，表格高度。可为数值、百分比或'auto'
-        colNames: colNames,
-        colModel: colModel,
-        viewrecords: true,//是否在浏览导航栏显示记录总数
-        rowNum: 20,//每页显示记录数
-        rowList: [10, 20, 30],//用于改变显示行数的下拉列表框的元素数组。
-        pager: "#classRoomNav",//分页、按钮所在的浏览导航栏
-        altRows: true,//设置为交替行表格,默认为false
-        //toppager: true,//是否在上面显示浏览导航栏
-        //multiselect: true,//是否多选
-        //multikey: "ctrlKey",//是否只能用Ctrl按键多选
-        //multiboxonly: true,//是否只能点击复选框多选
-        //subGrid : true,
-        //sortname:'id',//默认的排序列名
-        //sortorder:'asc',//默认的排序方式（asc升序，desc降序）
-        caption: "教室课表",//表名
-        autowidth: true//自动宽
-    });
-
-
-    for (var d=0; d<classes.length; d++) {
-        $("#classSel").append("<option value=" + d + ">" + classes[d].id + "</option>");
-    }
-    var classData = [];
-    for (var t=0; t<times.length; t++) {
-        var row = {secNO: t+1};
-        for (var d=0; d<days.length; d++) {
-            row[d+1] = "";
-        }
-        classData.push(row);
-    }
-    $("#classTable").jqGrid({
-        data: classData,//当 datatype 为"local" 时需填写
-        datatype: "local", //数据来源，本地数据（local，json,jsonp,xml等）
-        height: 300,//高度，表格高度。可为数值、百分比或'auto'
-        colNames: colNames,
-        colModel: colModel,
-        viewrecords: true,//是否在浏览导航栏显示记录总数
-        rowNum: 20,//每页显示记录数
-        rowList: [10, 20, 30],//用于改变显示行数的下拉列表框的元素数组。
-        pager: "#classNav",//分页、按钮所在的浏览导航栏
-        altRows: true,//设置为交替行表格,默认为false
-        //toppager: true,//是否在上面显示浏览导航栏
-        //multiselect: true,//是否多选
-        //multikey: "ctrlKey",//是否只能用Ctrl按键多选
-        //multiboxonly: true,//是否只能点击复选框多选
-        //subGrid : true,
-        //sortname:'id',//默认的排序列名
-        //sortorder:'asc',//默认的排序方式（asc升序，desc降序）
-        caption: "教学班课表",//表名
-        autowidth: true//自动宽
-    });
-}
-
-window.onload = function () {
-    initSelectText();
-};
