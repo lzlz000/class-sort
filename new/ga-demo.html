@@ -1,0 +1,257 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>遗传算法</title>
+    <link rel="stylesheet" type="text/css" href="./lib/element-ui/index.css" />
+    <script src="./lib/vue.js"></script>
+    <script src="./lib/element-ui/index.js"></script>
+    <style>
+        #tables .cell{
+            text-align: center;
+        }
+    </style>
+</head>
+<body>
+<div id="control">
+<el-form :inline="true" size="mini" style="border-bottom:1px solid #ccc">
+    <el-form-item >
+        <el-button-group>
+            <el-button size="mini" type="primary" @click="gaMain()" >执行排课算法</el-button>
+            <el-button size="mini" @click="coverData()">覆盖初始数据</el-button>
+            <el-button size="mini" @click="draw(true)">清空图表</el-button>
+        </el-button-group>
+    </el-form-item>
+    <el-form-item label="log level:">
+        <el-select size="mini" v-model="logLevel"
+            @change="changeLogLevel()" style="width:100px">
+            <el-option label="DEBUG" value="0">DEBUG</el-option>
+            <el-option label="INFO" value="1">INFO</el-option>
+            <el-option label="NONE" value="2">NONE</el-option>
+        </el-select>
+    </el-form-item>
+    <el-form-item label="迭代次数:">
+        <el-select size="mini" v-model="iteratorNum"
+            @change="changeIteratorNum()" style="width:80px">
+            <el-option value="0"></el-option>
+            <el-option value="100"></el-option>
+            <el-option value="150"></el-option>
+            <el-option value="200"></el-option>
+            <el-option value="400"></el-option>
+            <el-option value="1000"></el-option>
+        </el-select>
+    </el-form-item>
+    <el-form-item label="增加迭代:">
+        <el-button-group>
+            <el-button size="mini" @click="addIter(50)" >50</el-button>
+            <el-button size="mini" @click="addIter(100)" >100</el-button>
+            <el-button size="mini" @click="addIter(150)" >200</el-button>
+            <el-button size="mini" @click="addIter(200)" >500</el-button>
+        </el-button-group>
+    </el-form-item>
+</el-form>
+</div>
+<!-- 为ECharts准备一个具备大小（宽高）的Dom -->
+<div id="chart" style="width: 100%;height:400px;margin-top: 10px;">算法未执行</div>
+<div id= "tables">
+    <el-form :inline="true" size="mini">
+        <el-form-item label="选择教室：">
+            <el-select size="mini" v-model="selectedRoom" @change="draw()" style="width:100px">
+                    <el-option v-for="room in rooms" :key="room.id" :value="room.id"></el-option>
+            </el-select>
+        </el-form-item>
+        <el-tag v-if="classRoomInfo" type="">{{classRoomInfo}}</el-tag>
+        <el-tag type="info">课程显示格式：课程名/lesson/教师/校区/onceHour </el-tag>
+    </el-form>
+   
+    <el-table :data="timetable" stripe style="width: 100%;" :cell-style="{padding:'5px'}">
+        <el-table-column prop="time" label="节次" width="50"></el-table-column>
+        <el-table-column prop="0" label="星期一"></el-table-column>
+        <el-table-column prop="1" label="星期二"></el-table-column>
+        <el-table-column prop="2" label="星期三"></el-table-column>
+        <el-table-column prop="3" label="星期四"></el-table-column>
+        <el-table-column prop="4" label="星期五"></el-table-column>
+        <el-table-column prop="5" label="星期六"></el-table-column>
+        <el-table-column prop="6" label="星期日"></el-table-column>
+    </el-table>
+    <div id="teacherTable">
+
+    </div>
+</div>
+<script src="./lib/echarts.min.js"></script>
+<script src="./common1.js"></script>
+<script src="./data.js"></script>
+<script src="./GA1.js"></script>
+<script src="./view.js"></script>
+<script>
+/**
+ * 渲染视图
+ */
+ var option = {
+    title: {
+        text: '基于遗传算法的自动排课'
+    },
+    tooltip : {
+        position:function(position){
+            //获取容器的宽度
+            return [position[0]+10, position[1]+10];
+        },
+        trigger: 'axis',
+        showDelay : 0,
+        axisPointer:{
+            show: true,
+            type : 'cross',
+            lineStyle: {
+                type : 'dashed',
+                width : 1
+            }
+        },
+        zlevel: 1
+    },
+    legend: {
+        data:[]
+    },
+    toolbox: {
+        show : true,
+        feature : {
+            mark : {show: true},
+            dataZoom : {show: true},
+            dataView : {show: true, readOnly: false},
+            restore : {show: true},
+            saveAsImage : {show: true}
+        }
+    },
+    xAxis : [
+        {
+            type : 'value',
+            scale:true,
+            name: '迭代次数'
+        }
+    ],
+    yAxis : [
+        {
+            type : 'value',
+            scale:true,
+            name: '染色体适应度'
+        }
+    ],
+    series : []
+};
+/**
+ * clear: 是否清空
+ * addtion: 是否为最后一条数据的追加值
+ */
+function draw(clear,addtion) {
+    var myChart = echarts.init(document.getElementById('chart'));
+    if (clear){
+        option.legend.data.length = 0;
+        option.series.length = 0;
+        myChart.clear();
+        myChart.setOption(option);
+        return;
+    }
+    if (addtion){
+        option.legend.data.pop();
+        option.series.pop();
+    }
+    var name = 'GA'+(option.series.length);
+    option.legend.data.push(name);
+    option.series.push({
+        name,
+        type:'scatter',
+        large: true,
+        symbolSize: 2,
+        data: (function () {
+            var d = [];
+            for (var itIndex=0; itIndex<logGenData.length; itIndex++) {
+                for (var chromosomeIndex=0; chromosomeIndex<logGenData[itIndex].length; chromosomeIndex++) {
+                    d.push([itIndex, parseInt(logGenData[itIndex][chromosomeIndex])]);
+                }
+            }
+            return d;
+        })()
+    });
+    
+    // 基于准备好的dom，初始化echarts实例
+    // 指定图表的配置项和数据
+    // 使用刚指定的配置项和数据显示图表。
+    myChart.setOption(option);
+}
+var control = new Vue({
+    el: '#control',
+    data: {
+        logLevel: logger.level+"",
+        iteratorNum : CONFIG.iteratorNum
+    },
+    created: function (){
+        // draw();
+    },
+    methods: {
+        draw: function(clear,addtion){
+            draw(clear,addtion);
+        },
+        gaMain: function(){
+            gaMain();
+            draw();
+            tables.clear(); 
+        },
+        coverData: function(){
+            coverData();
+        },
+        changeLogLevel: function(){
+            logger.level = this.logLevel;
+        },
+        changeIteratorNum: function(){
+            CONFIG.iteratorNum = this.iteratorNum;
+        },
+        addIter: function(num){
+            if (chromosomeSet && chromosomeSet.length) {
+                gaIterate(num);
+                draw(false,true);
+                tables.clear();
+            }
+        }
+    }
+})
+var tables = new Vue({
+    el: '#tables',
+    data: {
+        timetable: [],
+        selectedRoom : null,
+        rooms: null,
+        classRoomInfo : null
+    },
+    methods: {
+        draw: function(){
+            this.buildRoomtable(this.selectedRoom);
+            this.classRoomInfo = roomToString(this.selectedRoom);
+        },
+        clear: function(){
+            this.rooms = classRooms;
+            this.selectedRoom = null; 
+            this.timetable = null;
+            this.classRoomInfo = null;
+        },
+        buildRoomtable: function(roomId){
+            let gene = chromosomeSet[0].geneOrder;
+            let timetable = (()=>{
+                let table = [];
+                for (let time = 0; time < TIMES; time++) {
+                    table.push({time:time+1})
+                }
+                return table;
+            })()
+            // timetable: [ {time:1,0:"课程1",1:"课程1",2:"课程1",3:"课程1",4:"课程1",5:"课程1",6:"课程1"},
+            for (let lessonIndex = 0; lessonIndex < gene.length; lessonIndex++) {
+                let pos = indexUtil.getPosition(gene[lessonIndex]);
+                if (classRooms[pos.room].id === roomId){
+                    timetable[pos.time][pos.day]=lessonToString(lessonIndex);
+                }
+            }
+            this.timetable = timetable;
+        }
+    }
+})
+</script>
+</body>
+</html>

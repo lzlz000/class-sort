@@ -90,25 +90,34 @@ function MapArr(){
 }
 
 /**
- * 带跳过的轮盘赌
- * @param {array} weight 概率数组 (下标: 元素编号、值: 该元素对应的概率)
+ * 带跳过的轮盘赌 TODO 经测试，轮盘赌是整个算法中耗时最多的部分，看看能否优化。
+ * @param {array} weight 课程概率数组 (下标: 元素编号、值: 该元素对应的概率)
  * @param {array} skip 可选参数 跳过序号的集合 若skip=[1,2]则不会选择数组中下标为1,2的元素，其他值按原概率分部
  * @param {array} skip2 可选参数 和skip 相同用途 但是有时候需要多个数组作为跳过的值 所以分为两个参数
  * @returns {number} 返回概率数组中某一元素的下标
  */
-function roll(weight,skip,skip2) {
+function roll(weights,skip,skip2) {
     var sum = 0;
-    var length = weight.length;
+    var length = weights.length;
     for (var i=0; i<length; i++) {
+        let weight = weights[i];
         // 当在skip数组当中 ，它的概率变为0
-        sum += skip && skip.includes(i) ? 0 :
-            skip2 && skip2.includes(i) ? 0 :weight[i];
+        if(weight == 0 ||(skip && skip.includes(i)) ||
+            (skip2 && skip2.includes(i))){
+            continue;
+        }
+        sum += weight;
     }
     var rand = Math.random() * sum;
     sum = 0;
     for (var i = 0; i<length; i++) {
-        sum += skip && skip.includes(i) ? 0 :
-            skip2 && skip2.includes(i) ? 0 :weight[i];
+        let weight = weights[i];
+        // 当在skip数组当中 ，它的概率变为0
+        if(weight == 0 ||(skip && skip.includes(i)) ||
+            (skip2 && skip2.includes(i))){
+            continue;
+        }
+        sum += weight;
         if (sum >= rand) {
             return i;
         }
@@ -141,19 +150,15 @@ function Timer(){
     }
 }
 function Logger(level){
-    var _currentLevel = level;
-    this.__proto__ ={
-        setLevel(level){
-            _currentLevel = level;
-        },
-        debug(... arr){
-            if(_currentLevel<=Logger.LEVEL.DEBUG)
-                console.log(arr.reduce((pre,cur)=>pre+" "+cur))
-        },
-        info(... arr){
-            if(_currentLevel<=Logger.LEVEL.INFO)
-                console.log(arr.reduce((pre,cur)=>pre+" "+cur))
-        }
+    this.level = level;
+
+    this.debug = (... args)=>{
+        if(this.level <= Logger.LEVEL.DEBUG)
+            console.log(args.reduce((a,b)=>a+" "+b))
+    }
+    this.info = (... args)=>{
+        if(this.level <= Logger.LEVEL.INFO)
+            console.log(args.reduce((a,b)=>a+" "+b))
     }
 }
 Logger.LEVEL={DEBUG:0,INFO:1,NONE:2}

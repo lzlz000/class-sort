@@ -16,8 +16,15 @@
     详见 vary()函数
 
 */
-// TODO 多节联排时应把联排的下一节课填满  
-// TODO 迭代结束后可以做一些转换，例如把同一门课换到同一个教室里
+// TODO 多节联排时应把联排的下一节课填满 ,也可以把联排数量不同的课程分段进行 先排4节-3节-2节这样
+/*
+TODO 迭代结束后可以做一些转换，例如把同一门课换到同一个教室里
+比如 A课程在 教室1-教室10的权重是相同的，那么他的多节课会被随机地分配到这10个教室
+在迭代过程中进行校验和交换是没有意义的，因为他不影响适应度，在交叉变异时又会趋向于分散，类似熵的增加
+
+
+
+*/
 /** 算法参数 */
 const CONFIG = {
     /** 染色体数量 */
@@ -31,7 +38,7 @@ const CONFIG = {
     /** 变异比例  取值[0,1) 不宜太大,较大会减少优势基因,并且影响运行效率 */
     varyRate : 0.05,
     /** 发生冲突时 重试的次数 在减少冲突和保证效率间找到平衡 */
-    conflictAttempt : 10,
+    conflictRetry : 10,
     // 以下为适应度参数
     /** 初始的适应度值 一个不太大的正整数 */
     initAdaptValue : 30, 
@@ -179,7 +186,7 @@ const indexUtil = new IndexUtil(DAYS,TIMES);indexUtil.hh
 const logger = new Logger(Logger.LEVEL.INFO);
 const conflict = new Conflict();
 // 算法入口
-function main(){
+function gaMain(){
     chromosomeSet = [];
     adaptability = [];
     logGenData = [];
@@ -197,8 +204,6 @@ function main(){
     logger.info("初始化基因完成\tcost:",timer.get());
     gaIterate(CONFIG.iteratorNum);
     logger.info("迭代完成\t\t\tcost:",timer.get());
-    buildMatrix();
-    draw(CONFIG.iteratorNum,CONFIG.chromosomeNum)
 }
 /**
  * 父母基因交叉获得下一代染色体
@@ -257,11 +262,11 @@ function cross(fatherGene,motherGene){
     // 检查子代基因的动态冲突并解决
     for (let i = 0; i < childGene.length; i++) {
         let daytime = childGene[i];
-        let attempt = CONFIG.conflictAttempt;
+        let retry = CONFIG.conflictRetry;
         let conflictArr = [];
         let conflictIndex = conflict.check(daytime,childGene);
         
-        while (attempt > 0 && conflictIndex >= 0) {
+        while (retry > 0 && conflictIndex >= 0) {
             conflictCount++;
             logger.debug("cross 时间冲突 lessonindex:",i,conflictIndex);
             conflictArr.push(conflictIndex); // 当前index不可选
@@ -270,7 +275,7 @@ function cross(fatherGene,motherGene){
                 break;
             }
             childGene[i] = daytime;
-            attempt--;
+            retry--;
         }
     }
     logger.debug("cross 时间冲突 数量:",conflictCount)
@@ -399,14 +404,14 @@ function generateChromosome(){
         
         // 发生冲突则重试指定次数，在防止死循环和减少冲突间保持平衡
         let conflictArr = [];
-        let attempt = CONFIG.conflictAttempt;
+        let retry = CONFIG.conflictRetry;
         let conflictIndex = conflict.check(lessonIndex,result);
-        while (attempt > 0 && conflictIndex>=0) {
+        while (retry > 0 && conflictIndex>=0) {
             logger.debug("generateChromosome 时间冲突 lessonindex:",lessonIndex,conflictIndex);
             conflictArr.push(index); // 当前index不可选
             index = roll(adapt,result,conflictArr);
             result[lessonIndex] = index;
-            attempt--;
+            retry--;
         }
     }
     var chromosome = new Chromosome(result);
@@ -553,6 +558,10 @@ var fixedCondition = [
     function(lesson,day,time,roomIndex,value){
         var course = coursesMap[lesson.course];
         var room = classRooms[roomIndex];
+        if(buildingsMap[room.building].zone != lesson.zone){
+            logger.debug('不满足校区要求 lesson:',lesson.id);
+            return CONFIG.unable;
+        }
         if(course.roomType != room.roomType){
             logger.debug('不满足教室类型 lesson:',lesson.id,'roomtype',room.roomType);
             return CONFIG.unable;
@@ -561,6 +570,9 @@ var fixedCondition = [
         if (ratio > 1) {
             logger.debug('教室容量不足 lesson:',lesson.id,'studentNum',lesson.studentNum,'capacity',room.capacity);
             return CONFIG.unable;
+        }
+        if (ratio > 0.8) {
+            return 5;
         }
         if (ratio < 0.5) {
             return -5;

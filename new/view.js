@@ -4,27 +4,12 @@ var chromosomeMatrix ;
 /** 教学班对应的时间片/排课结果 三维矩阵 B={ChromosomeNO, Class,Times} -> roomNO+dayNO+timeNO */
 var classMatrixes;
 
-function buildMatrix(){
-    chromosomeMatrix = [];
-    classMatrixes = [];
-    for (let i = 0; i < chromosomeSet.length; i++) {
-        const chromosome = chromosomeSet[i];
-        chromosomeMatrix[i] = [];
-        // 初始化
-        for (let r = 0; r < classRooms.length; r++) {
-            chromosomeMatrix[i][r]=[];
-            for (let d = 0; d < DAYS; d++) {
-                chromosomeMatrix[i][r][d]=[];
-                for (let t = 0; t < TIMES; t++) {
-                    chromosomeMatrix[i][r][d][t]=-1;
-                }
-            }
-            
-        }
-        let gene = chromosome.geneOrder;
-        for (let lessonIndex = 0; lessonIndex < gene.length; lessonIndex++) {
-            let pos = indexUtil.getPosition(gene[lessonIndex]);
-            chromosomeMatrix[i][pos.room][pos.day][pos.time]=lessonIndex;
-        }
-    }
+function lessonToString(lessonIndex){
+    let lesson = lessons[lessonIndex];
+    let course = coursesMap[lessons[lessonIndex].course];
+    return course.name+"/"+lesson.id+"/"+lesson.teacher+"/"+lesson.zone+"/"+course.onceHour
+}
+function roomToString (roomId) {
+    let room = classroomsMap[roomId];
+    return room?"教室:"+room.id+" 校区:"+buildingsMap[room.building].zone+" 容量:"+ room.capacity+" 类型:"+room.roomType:"";
 }
