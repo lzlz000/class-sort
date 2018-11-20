@@ -191,7 +191,6 @@ Logger.LEVEL={DEBUG:0,INFO:1,NONE:2}
  * @param {number} badSelect 差选择数量
  */
 function Chromosome(geneOrder,badSelect){
-    console.log("badSelect",badSelect);
     this.badSelect = badSelect;
     this.setGeneOrder=(geneOrder)=>{
         _setGeneOrder(geneOrder);
@@ -216,10 +215,15 @@ function Chromosome(geneOrder,badSelect){
 function Conflict(){
     this._conflicts = [];
     this._conflictMap = {};
+    this._campusConflicts = [];
+    this._campusConflictMap = {};
     /**
-     * 添加冲突数组，代表一个冲突所关联的所有课程下标，
+     * 记录同个排课单元的课程索引
+     * 添加冲突数组，代表一个冲突所关联的所有课程下标
      * 例如 老师A需要上的课程对应下标为 1,3,45,123,333 则这些下表代表一个冲突
      * @param {number[]} arr arr.length<=1会被忽略,1个元素不存在冲突
+     * @param scope Conflict.Scope
+     * @param {string} remark 备注 方便调试
      */
     this.add = (arr,scope,remark)=>{
         if(arr.length<=1)
@@ -242,6 +246,8 @@ function Conflict(){
      */
     this.relatedDayTime= (index,geneOrder)=>{
         let conflicts = this._conflictMap[index];
+        let lesson = lessons[index];
+        let campus = lesson.zone;
         let set = new Set();
         if (!conflicts)
             return set;
@@ -271,6 +277,11 @@ function Conflict(){
                             break;
                         default:
                             throw "没有选择冲突时间范围"
+                    }
+                    let conflictLesson = lessons[lessonIndex];
+                    //校区冲突
+                    if (conflictLesson.zone != campus){
+                        indexUtil.sameHalfDay(dayTimeRoom).forEach(dayTimeRoom1 => set.add(dayTimeRoom1));
                     }
                 }
             }

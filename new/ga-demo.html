@@ -54,8 +54,13 @@
 <!-- 为ECharts准备一个具备大小（宽高）的Dom -->
 <div id="chart" style="width: 100%;height:400px;margin-top: 10px;">算法未执行</div>
 <div id= "tables">
+    <div style="font-size:14px">
+        需满足要求:<br>
+        1. 同个老师（定义为排课单元，同个教学班/培养计划同理）课程时间不能冲突<br>
+        2. 同门课程不同课时不在同一天排课 <br>
+        3. 同个排课单元不同校区的课程不在同一个半天
+    </div>
     <el-form size="mini">
-        <el-tag type="warning">TODO 跨校区不同个半天的问题要解决</el-tag>
         <el-form-item label="选择老师：">
             <el-select v-model="selected.teacher" @change="buildTeacherTimetable()" style="width:100px">
                 <el-option v-for="room in teachers" :key="room.id" :value="room.id"></el-option>

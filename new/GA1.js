@@ -6,9 +6,10 @@
     的获得对应索引的 day time room在数组中的索引值,从而避免了复杂的数组嵌套
 静态约束:
     一门课的教室类型、校区、老师、人数、时间需求等在排课之前就已经确定的条件,详见 fixedCondition
+排课单元：
+    在时间上互相有约束关系的一组课程，例如同一个老师的多门课程，同一个培养方案中的多门课程，同一门课在一周内的不同课时
 动态时间约束：
-    一个老师授课的多门课、同一节课在一周中安排的多个不相连课时、同一个班级的课程等均不能在同一时间安排
-    然而课程的安排是动态的，他们之间的约束关系也需要动态的检查，在初始化基因组、交叉、变异时都必须考虑动态约束
+    排课单元内的课程安排是动态的，他们之间的约束关系也需要动态的检查，在初始化基因组、交叉、变异时都必须考虑动态约束
     详见 common1.js-Conflict类 和其实例conflict变量的使用
 交叉：
     详见 cross()函数
@@ -30,7 +31,7 @@ const CONFIG = {
     /** 染色体数量 */
     chromosomeNum : 20,
     /** 迭代次数 */
-    iteratorNum : 150,
+    iteratorNum : 200,
     /** 不参加交叉直接保留给下一代的最好基因 应该小于crossRate 在小数据量下测试0.15是最佳选择 */ 
     survivalRate : 0.15,
     /** 有权繁殖下一代的比例 按照适应度排序  取值(0,1) 取值过大难以淘汰劣势基因，取值过小容易过早陷入局部最优解 */ 
@@ -352,7 +353,7 @@ function initLessons(){
     for (const key in teacherConflict) {
         const conflictArr = teacherConflict[key];
         conflict.add(conflictArr ,Conflict.Scope.time,"教师"+key);
-        // 老师的校区冲突 不能在同一个半天在不同校区开课
+        //TODO 老师的校区冲突 不能在同一个半天在不同校区开课
         // const campusConflict = {};
         // conflictArr.forEach(lessonIndex =>{
         //     let lesson = lessons[lessonIndex];
@@ -382,7 +383,6 @@ function initCaches() {
         
     });
 }
-var c1;
 /**
  * 初始化染色体
  */
@@ -392,7 +392,6 @@ function initChromosome (){
         chromosomeSet.push(generateChromosome());
         logger.info("初始化基因",i,timer.get())
     }
-    c1=chromosomeSet;
 }
 /**
  * 随机生成一组染色体 轮盘赌
