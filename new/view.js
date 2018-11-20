@@ -4,12 +4,12 @@ var chromosomeMatrix ;
 /** 教学班对应的时间片/排课结果 三维矩阵 B={ChromosomeNO, Class,Times} -> roomNO+dayNO+timeNO */
 var classMatrixes;
 
-const lessonFormat = `[lessonIndex]course.name/lesson.id/lesson.teacher/lesson.zone/course.onceHour/lesson.studentNum/roomId`;
+const lessonFormat = `[lessonIndex]id+name/lesson.teacher/lesson.zone/course.onceHour/lesson.studentNum/roomId`;
 function lessonToString(lessonIndex,geneOrder){
     let lesson = lessons[lessonIndex];
     let course = coursesMap[lessons[lessonIndex].course];
     let roomId = classRooms[indexUtil.getRoom(geneOrder[lessonIndex])].id
-    return "["+lessonIndex+"]"+course.name+"/"+lesson.id+"/"+lesson.teacher+"/"+lesson.zone
+    return "["+lessonIndex+"]"+lesson.id+course.name+"/"+lesson.teacher+"/"+lesson.zone
         +"/"+course.onceHour+"/"+lesson.studentNum +"/"+roomId;
 }
 function roomToString (roomId) {
