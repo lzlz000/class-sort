@@ -104,10 +104,11 @@ function IndexUtil(days,times){
  * 带跳过的轮盘赌 TODO 经测试，轮盘赌是整个算法中耗时最多的部分，看看能否优化。
  * @param {array} weight 课程概率数组 (下标: 元素编号、值: 该元素对应的概率)
  * @param {array} skip 可选参数 跳过序号的集合 若skip=[1,2]则不会选择数组中下标为1,2的元素，其他值按原概率分部
- * @param {function} filter 过滤函数，接受参数时空索引 ，返回>0 则替代权重
+ * @param {function} negativeFilter 消极过滤函数，接受参数 时空索引，
+ *      返回 ture 则按照消极对待 会以极小的概率选择此值，可以认为只有没有其他任何选择时才会选中此值
  * @returns {object} 返回 {index,bad} 概率数组中某一元素的下标 及是否为较差选择
  */
-function roll(weights,skip,filter) {
+function roll(weights,skip,negativeFilter) {
     var sum = 0;
     var length = weights.length;
     let badSet = new Set();
@@ -117,7 +118,7 @@ function roll(weights,skip,filter) {
         if(weight == 0 ||(skip && skip.includes(i))){
             continue;
         }
-        if (filter && filter(i)){
+        if (negativeFilter && negativeFilter(i)){
             weight = weight * 0.000001;
             badSet.add(i);
         }
@@ -131,19 +132,16 @@ function roll(weights,skip,filter) {
         if(weight == 0 ||(skip && skip.includes(i))){
             continue;
         }
-        if (filter && filter(i)){
+        if (negativeFilter && negativeFilter(i)){
             weight = weight * 0.000001;
         }
         sum += weight;
         
         if (sum >= rand) {
-            let t = badSet.has(i);
-            if(t)
-                console.log('11111')
-            return {index:i,bad:t};
+            return i;
         }
     }
-    return {index:-1,bad:false};
+    return -1;
 }
 
 /**
@@ -203,7 +201,7 @@ function Chromosome(geneOrder,badSelect){
             const spaceTimeIndex = geneOrder[lessonIndex];
             this.adapt += adaptability[lessonIndex][spaceTimeIndex];
         }
-        this.adapt -= badSelect * CONFIG.badSelectVal;
+        this.adapt -= badSelect *CONFIG.badSelectVal;
     }
     _setGeneOrder(geneOrder);
 }

@@ -1,4 +1,13 @@
-// 遗传算法的另一实现 by lz 与原算法主要区别 不计算强制约束
+// 遗传算法
+
+// TODO 把联排数量不同的课程分段进行 先排4节-3节-2节这样
+/*
+TODO 迭代结束后可以做一些转换，例如把同一门课换到同一个教室里
+比如 A课程在 教室1-教室10的权重是相同的，那么他的多节课会被随机地分配到这10个教室
+
+另一种方式为动态转换
+
+*/
 /*
 时空索引：
     时间(day,time)，空间(room) 他们以确定的关系组成一个唯一的正整数（详见common1.js IndexUtil类）,
@@ -10,22 +19,14 @@
     在时间上互相有约束关系的一组课程，例如同一个老师的多门课程，同一个培养方案中的多门课程，同一门课在一周内的不同课时
 动态时间约束：
     排课单元内的课程安排是动态的，他们之间的约束关系也需要动态的检查，在初始化基因组、交叉、变异时都必须考虑动态约束
-    详见 common1.js-Conflict类 和其实例conflict变量的使用
+    详见 common1.js-Conflict类 和其实体 conflict变量的使用
 交叉：
     详见 cross()函数
 变异：
     详见 vary()函数
 
 */
-// TODO 多节联排时应把联排的下一节课填满 ,也可以把联排数量不同的课程分段进行 先排4节-3节-2节这样
-/*
-TODO 迭代结束后可以做一些转换，例如把同一门课换到同一个教室里
-比如 A课程在 教室1-教室10的权重是相同的，那么他的多节课会被随机地分配到这10个教室
-在迭代过程中进行校验和交换是没有意义的，因为他不影响适应度，在交叉变异时又会趋向于分散，类似熵的增加
 
-
-
-*/
 /** 算法参数 */
 const CONFIG = {
     /** 染色体数量 */
@@ -46,9 +47,8 @@ const CONFIG = {
     initAdaptValue : 30, 
     /** 一个绝对值较大的负数,代表完全不可用的适应度，保证适应度+unable<=0*/
     unable : -10000, 
-    /** 差选择：生成基因过程中产生的冲突数量，每个冲突是一个“差选择”，每个差选择扣除一定的适应度值，
-     * 但不宜太大，会影响基因的丰富程度，迭代效果下降
-     * */
+    /** 差选择扣分：生成基因过程中产生的冲突数量，每个冲突是一个“差选择”，每个差选择扣除一定的适应度值的比例，
+     * 不宜太大，会影响基因的丰富程度，迭代效果下降 */
     badSelectVal : 15
 }
 
@@ -193,9 +193,6 @@ const logger = new Logger(Logger.LEVEL.INFO);
 const conflict = new Conflict();
 // 算法入口
 function gaMain(){
-    chromosomeSet = [];
-    adaptability = [];
-    logGenData = [];
     var timer = new Timer();
     // 初始化map缓存
     initCaches();
@@ -208,6 +205,7 @@ function gaMain(){
     logger.info("初始化适应度完成\tcost:",timer.get());
     initChromosome();
     logger.info("初始化基因完成\tcost:",timer.get());
+    logGenData = [];
     gaIterate(CONFIG.iteratorNum);
     logger.info("迭代完成\t\t\tcost:",timer.get());
 }
@@ -264,17 +262,22 @@ function cross(fatherGene,motherGene){
             childGene[index] = fromFather? fatherGene[index]: motherGene[index];
         }
     }
-    // 检查子代基因的动态冲突并计数
+    return childGene;
+}
+/**
+ * 检查子代基因的动态冲突并计数
+ * @param {number[]} gene 基因序列
+ */
+function checkBadSelect(gene){
     let badSelect = 0;
-    for (let i = 0; i < childGene.length; i++) {
+    for (let i = 0; i < gene.length; i++) {
         // let adapt = adaptability[i];
-        let check= conflict.relatedDayTime(i,childGene);
-        if(check.has(indexUtil.getDayTime(childGene[i]))){
+        let check= conflict.relatedDayTime(i,gene);
+        if(check.has(indexUtil.getDayTime(gene[i]))){
             badSelect ++;
         }
     }
-    
-    return {childGene,badSelect};
+    return badSelect;
 }
 /**
  * 变异
@@ -286,8 +289,8 @@ function vary(geneOrder){
             let adapt = adaptability[i];
             let conflictSet = conflict.relatedDayTime(i,geneOrder);
             let result = roll(adapt,geneOrder,dayTimeRoom => conflictSet.has(indexUtil.getDayTime(dayTimeRoom)));
-            if (result.index>=0 && !result.bad){
-                geneOrder[i] = result.index;
+            if (result>=0) {
+                geneOrder[i] = result;
             }
         }
     }
@@ -302,7 +305,6 @@ function gaIterate(num){
     for (let i = 0; i < num; i++) {
         logger.info("---第"+i+"代\tcost:",timer.get(),"---");
         let nextGen = []; // 下一代染色体集合
-        chromosomeSet.sort((a,b) => b.adapt-a.adapt); //染色体根据适应度由大到小排序
         logGenData.push(chromosomeSet.map(chromosome => chromosome.adapt));
 
         //保留最好的基因直接传给下一代
@@ -323,14 +325,15 @@ function gaIterate(num){
             }
             let father = chromosomeSet[fatherIndex];
             let mother = chromosomeSet[motherIndex];
-            let badSelect = 0;
-            let result = cross(father.geneOrder,mother.geneOrder);
-            badSelect+=result.badSelect;
+            // 交叉
+            let child = cross(father.geneOrder,mother.geneOrder);
             // 变异
-            vary(result.childGene);
-            nextGen.push(new Chromosome(result.childGene,badSelect))
+            vary(child);
+            let badSelect = checkBadSelect(child);
+            nextGen.push(new Chromosome(child,badSelect))
         }
         chromosomeSet = nextGen;
+        chromosomeSet.sort((a,b) => b.adapt-a.adapt); //染色体根据适应度由大到小排序
     }
 }
 function initLessons(){
@@ -350,23 +353,22 @@ function initLessons(){
             teacherConflict[lesson.teacher].push(lessons.length-1);
             conflictArr.push(lessons.length-1);
         }
-        conflict.add(conflictArr,Conflict.Scope.day,"同门课程"+lesson.id);// 同门课程不会安排在同一天
+        // 同门课程动态冲突 ，一周两节 则保证不在相邻天 3-4节保证不在同一天 否则保证不在同个半天
+        switch (timesPerWeek) {
+            case 2:
+                conflict.add(conflictArr,Conflict.Scope.skipDay,"同门课程"+lesson.id);
+                break;
+            case 3:
+            case 4:
+                conflict.add(conflictArr,Conflict.Scope.day,"同门课程"+lesson.id);
+                break;
+            default:
+                conflict.add(conflictArr,Conflict.Scope.halfDay,"同门课程"+lesson.id);
+        }
     });
     for (const key in teacherConflict) {
         const conflictArr = teacherConflict[key];
         conflict.add(conflictArr ,Conflict.Scope.time,"教师"+key);
-        //TODO 老师的校区冲突 不能在同一个半天在不同校区开课
-        // const campusConflict = {};
-        // conflictArr.forEach(lessonIndex =>{
-        //     let lesson = lessons[lessonIndex];
-        //     if (!campusConflict[lesson.zone]){
-        //         campusConflict[lesson.zone] = [];
-        //     }
-        //     campusConflict [lesson.zone].push(lessonIndex);
-        // });
-        // for (const campus in campusConflict) {
-        //     conflict.add(campusConflict[campus] ,Conflict.Scope.halfDay,"教师"+key+" 校区"+campus);
-        // }
         
     }
 }
@@ -389,32 +391,33 @@ function initCaches() {
  * 初始化染色体
  */
 function initChromosome (){
+    chromosomeSet = [];
     var timer = new Timer();
     for (let i = 0; i < CONFIG.chromosomeNum; i++) {
+        let chromosome = generateChromosome();
         chromosomeSet.push(generateChromosome());
         logger.info("初始化基因",i,timer.get())
     }
+    chromosomeSet.sort((a,b) => b.adapt-a.adapt);
 }
 /**
  * 随机生成一组染色体 轮盘赌
  */
 function generateChromosome(){
 
-    var result = [];
+    var gene = [];
     // 从所有课程中随机取值 而不是从第一个开始 避免每次都是排在数组最开始位置的课程有最优先的选择，使种群的基因更丰富
     var randomIndex = new RandomIndex(adaptability.length); 
     var lessonIndex;
     var badSelect = 0;
     while((lessonIndex=randomIndex.next())>=0){
         let adapt = adaptability[lessonIndex]
-        let conflictSet = conflict.relatedDayTime(lessonIndex,result);
-        let solution =  roll(adapt,result,roomTime => conflictSet.has(indexUtil.getDayTime(roomTime)));
-        if (solution.bad)
-            badSelect ++;
-        let dayTimeRoom = solution.index;
-        result[lessonIndex] = dayTimeRoom;
+        let conflictSet = conflict.relatedDayTime(lessonIndex,gene);
+        let result =  roll(adapt,gene,roomTime => conflictSet.has(indexUtil.getDayTime(roomTime)));
+        let dayTimeRoom = result;
+        gene[lessonIndex] = dayTimeRoom;
     }
-    var chromosome = new Chromosome(result,badSelect);
+    var chromosome = new Chromosome(gene,badSelect);
 
     return chromosome;
 }
@@ -468,8 +471,7 @@ function adapt(lessonIndex,day,time,roomIndex){
 }
 
 /*
- * 满足的约束（冲突）  
- * 该如何解决这些问题？
+ * 满足的约束（冲突）  √ 代表已解决
  * 
  * √ 同一时间片一个教师只能上一门课程
  * √ 某一教室的某一时间片只能被一门课程占用
@@ -480,11 +482,9 @@ function adapt(lessonIndex,day,time,roomIndex){
  * √ 同一课程的一次课分配在同一时段（上午/下午/晚上）
  * √ 较高的教室利用率（上课人数
  * √ 晚上/周二下午/周六尽量不排课 （这个应该是动态设置的）
- * 一周内同一门课程均匀分布
- * 同一教学班任务不要在同一天内连续的开课
- * 老师不能在同一个半天上跨校区课
+ * √ 同一教学班任务不要在同一天内连续的开课，一周内同一门课程均匀分布 动态冲突 a)一周2节保证不在相邻天排课 b)3-5节保证不在同一天排课
+ * √ 老师不能在同一个半天上跨校区课
 */
-//TODO 适应度参数调整是算法的关键
 /**
  * 此处为固定条件 动态条件需要每次迭代修改适应度 
  * 例如 课程的时间教室类型选择属于固定条件
@@ -516,18 +516,18 @@ var fixedCondition = [
         if (day == 6) { // 周日不排课
             return CONFIG.unable;
         }
-        let val = 0;
-        if (day == 5){
-            val += -5;
+        if (time >= 8 || (day == 1 && time >= 4)) { // 晚上/周二下午不排课
+            return CONFIG.unable;
         }
-        if (time >= 8 || (day == 1 && time >= 4)) { // 晚上/周6/周二下午尽量不排课 因此降低优先级
+        let val = 0;
+        if (day == 5){ // 周六尽量不排课
             val += -10;
         }
-        if (time < 4) { // 早上更优先
-            val += 4;
+        if (time < 4) { // 早上最优先
+            val += 6;
         }
-        if (time < 6) { // 下午前两节优先
-            val += 1;
+        if (time>=4 && time < 6) { // 下午前两节优先
+            val += 3;
         }
         return val;
     },
@@ -578,7 +578,7 @@ var fixedCondition = [
             return CONFIG.unable;
         }
         if (ratio > 0.8) {
-            return 5;
+            return 10;
         }
         if (ratio < 0.5) {
             return -5;
