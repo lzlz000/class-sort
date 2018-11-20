@@ -45,8 +45,8 @@
         <el-button-group>
             <el-button size="mini" @click="addIter(50)" >50</el-button>
             <el-button size="mini" @click="addIter(100)" >100</el-button>
-            <el-button size="mini" @click="addIter(150)" >200</el-button>
-            <el-button size="mini" @click="addIter(200)" >500</el-button>
+            <el-button size="mini" @click="addIter(200)" >200</el-button>
+            <el-button size="mini" @click="addIter(500)" >500</el-button>
         </el-button-group>
     </el-form-item>
 </el-form>
@@ -54,29 +54,35 @@
 <!-- 为ECharts准备一个具备大小（宽高）的Dom -->
 <div id="chart" style="width: 100%;height:400px;margin-top: 10px;">算法未执行</div>
 <div id= "tables">
-    <el-form :inline="true" size="mini">
-        <el-form-item label="选择教室：">
-            <el-select size="mini" v-model="selectedRoom" @change="draw()" style="width:100px">
-                    <el-option v-for="room in rooms" :key="room.id" :value="room.id"></el-option>
+    <el-form size="mini">
+        <el-tag type="warning">TODO 跨校区不同个半天的问题要解决</el-tag>
+        <el-form-item label="选择老师：">
+            <el-select v-model="selected.teacher" @change="buildTeacherTimetable()" style="width:100px">
+                <el-option v-for="room in teachers" :key="room.id" :value="room.id"></el-option>
             </el-select>
+            <el-tag type="info">格式：{{lessonFormat}} </el-tag>
         </el-form-item>
-        <el-tag v-if="classRoomInfo" type="">{{classRoomInfo}}</el-tag>
-        <el-tag type="info">课程显示格式：课程名/lesson/教师/校区/onceHour </el-tag>
     </el-form>
-   
-    <el-table :data="timetable" stripe style="width: 100%;" :cell-style="{padding:'5px'}">
-        <el-table-column prop="time" label="节次" width="50"></el-table-column>
-        <el-table-column prop="0" label="星期一"></el-table-column>
-        <el-table-column prop="1" label="星期二"></el-table-column>
-        <el-table-column prop="2" label="星期三"></el-table-column>
-        <el-table-column prop="3" label="星期四"></el-table-column>
-        <el-table-column prop="4" label="星期五"></el-table-column>
-        <el-table-column prop="5" label="星期六"></el-table-column>
-        <el-table-column prop="6" label="星期日"></el-table-column>
-    </el-table>
-    <div id="teacherTable">
-
-    </div>
+    <timetable :table="timetable.teacher"></timetable>
+    <el-form size="mini">
+        <el-form-item label="选择课程：">
+            <el-select v-model="selected.lesson" @change="buildLessonTimetable()" style="width:100px">
+                <el-option v-for="room in lessons" :key="room.id" :value="room.id"></el-option>
+            </el-select>
+            <el-tag type="info">格式：{{lessonFormat}} </el-tag>
+        </el-form-item>
+    </el-form>
+    <timetable :table="timetable.lesson"></timetable>
+    <el-form size="mini">
+        <el-form-item label="选择教室：">
+            <el-select v-model="selected.room" @change="buildRoomTimetable()" style="width:100px">
+                <el-option v-for="room in rooms" :key="room.id" :value="room.id"></el-option>
+            </el-select>
+            <el-tag type="info">格式：{{lessonFormat}} </el-tag>
+            <el-tag v-if="info.room">{{info.room}}</el-tag>
+        </el-form-item>
+    </el-form>
+    <timetable :table="timetable.room"></timetable>
 </div>
 <script src="./lib/echarts.min.js"></script>
 <script src="./common1.js"></script>
@@ -213,26 +219,70 @@ var control = new Vue({
         }
     }
 })
+Vue.component('timetable',{
+        template:`
+        <div>
+        <el-table v-if="table" :data="table" stripe style="width: 100%;" :cell-style="{padding:'5px','font-size':'12px'}">
+            <el-table-column prop="time" label="节次" width="50"></el-table-column>
+            <el-table-column prop="0" label="星期一"></el-table-column>
+            <el-table-column prop="1" label="星期二"></el-table-column>
+            <el-table-column prop="2" label="星期三"></el-table-column>
+            <el-table-column prop="3" label="星期四"></el-table-column>
+            <el-table-column prop="4" label="星期五"></el-table-column>
+            <el-table-column prop="5" label="星期六"></el-table-column>
+            <el-table-column prop="6" label="星期日"></el-table-column>
+        </el-table></div>`,
+        props:{
+            table:Array
+        },
+    });
 var tables = new Vue({
     el: '#tables',
     data: {
-        timetable: [],
-        selectedRoom : null,
+        lessonFormat : lessonFormat,
+        timetable : {
+            room: null,
+            teacher: null,
+            lesson: null,
+        },
+        selected :{
+            room: null,
+            teacher: null,
+            lesson: null,
+        },
+        info :{
+            room: null,
+            teacher: null,
+            lesson: null,
+        },
         rooms: null,
-        classRoomInfo : null
+        teachers: null,
+        lessons: null,
     },
     methods: {
-        draw: function(){
-            this.buildRoomtable(this.selectedRoom);
-            this.classRoomInfo = roomToString(this.selectedRoom);
-        },
         clear: function(){
             this.rooms = classRooms;
-            this.selectedRoom = null; 
-            this.timetable = null;
+            this.teachers = teachers;
+            this.lessons = lessonClasses;
+            this.selected = {
+                room: null,
+                teacher: null,
+                lesson: null,
+            }; 
+            this.timetable = {
+                room: null,
+                teacher: null,
+                lesson: null,
+            };
+            this.info = {
+                room: null,
+                teacher: null,
+                lesson: null,
+            };
             this.classRoomInfo = null;
         },
-        buildRoomtable: function(roomId){
+        buildRoomTimetable: function(){
+            const roomId = this.selected.room;
             let gene = chromosomeSet[0].geneOrder;
             let timetable = (()=>{
                 let table = [];
@@ -245,11 +295,64 @@ var tables = new Vue({
             for (let lessonIndex = 0; lessonIndex < gene.length; lessonIndex++) {
                 let pos = indexUtil.getPosition(gene[lessonIndex]);
                 if (classRooms[pos.room].id === roomId){
-                    timetable[pos.time][pos.day]=lessonToString(lessonIndex);
+                    let lesson = lessons[lessonIndex];
+                    let course = coursesMap[lessons[lessonIndex].course];
+                    if(!timetable[pos.time][pos.day])
+                        timetable[pos.time][pos.day]=lessonToString(lessonIndex,gene);
+                    else
+                        timetable[pos.time][pos.day]+="(冲突)"+lessonToString(lessonIndex,gene);
                 }
             }
-            this.timetable = timetable;
-        }
+            this.timetable.room = timetable;
+            this.info.room = JSON.stringify(classroomsMap[this.selected.room]);
+        },
+        buildTeacherTimetable:function(){
+            const teacherId = this.selected.teacher;
+            let gene = chromosomeSet[0].geneOrder;
+            let timetable = (()=>{
+                let table = [];
+                for (let time = 0; time < TIMES; time++) {
+                    table.push({time:time+1})
+                }
+                return table;
+            })()
+            // timetable: [ {time:1,0:"课程1",1:"课程1",2:"课程1",3:"课程1",4:"课程1",5:"课程1",6:"课程1"},
+            for (let lessonIndex = 0; lessonIndex < gene.length; lessonIndex++) {
+                let lesson = lessons[lessonIndex];
+                if (lesson.teacher == teacherId){
+                    let pos = indexUtil.getPosition(gene[lessonIndex]);
+                    if(!timetable[pos.time][pos.day])
+                        timetable[pos.time][pos.day]=lessonToString(lessonIndex,gene);
+                    else
+                        timetable[pos.time][pos.day]+="(冲突)"+lessonToString(lessonIndex,gene);
+                }
+            }
+            this.timetable.teacher = timetable;
+            this.info.teacher = JSON.stringify(teachersMap[this.selected.teacher]);
+        },
+        buildLessonTimetable:function(){
+            const lessonId = this.selected.lesson;
+            let gene = chromosomeSet[0].geneOrder;
+            let timetable = (()=>{
+                let table = [];
+                for (let time = 0; time < TIMES; time++) {
+                    table.push({time:time+1})
+                }
+                return table;
+            })()
+            // timetable: [ {time:1,0:"课程1",1:"课程1",2:"课程1",3:"课程1",4:"课程1",5:"课程1",6:"课程1"},
+            for (let lessonIndex = 0; lessonIndex < gene.length; lessonIndex++) {
+                let lesson = lessons[lessonIndex];
+                if (lesson.id == lessonId){
+                    let pos = indexUtil.getPosition(gene[lessonIndex]);
+                    if(!timetable[pos.time][pos.day])
+                        timetable[pos.time][pos.day]=lessonToString(lessonIndex,gene);
+                    else
+                        timetable[pos.time][pos.day]+="(冲突)"+lessonToString(lessonIndex,gene);
+                }
+            }
+            this.timetable.lesson = timetable;
+        },
     }
 })
 </script>

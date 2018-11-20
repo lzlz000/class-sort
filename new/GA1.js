@@ -37,13 +37,16 @@ const CONFIG = {
     crossRate : 0.5, 
     /** 变异比例  取值[0,1) 不宜太大,较大会减少优势基因,并且影响运行效率 */
     varyRate : 0.05,
-    /** 发生冲突时 重试的次数 在减少冲突和保证效率间找到平衡 */
-    conflictRetry : 10,
+    // /** 发生冲突时 重试的次数 在减少冲突和保证效率间找到平衡 */
+    // conflictRetry : 100,
+
     // 以下为适应度参数
     /** 初始的适应度值 一个不太大的正整数 */
     initAdaptValue : 30, 
     /** 一个绝对值较大的负数,代表完全不可用的适应度 */
     unable : -10000, 
+    /** 差选择：生成基因过程中产生的冲突数量，每个冲突是一个“差选择”，每个差选择扣除一定的适应度值  */
+    badSelectVal : 15
 }
 
 // start 变量定义
@@ -258,29 +261,17 @@ function cross(fatherGene,motherGene){
             childGene[index] = fromFather? fatherGene[index]: motherGene[index];
         }
     }
-    let conflictCount = 0;
-    // 检查子代基因的动态冲突并解决
+    // 检查子代基因的动态冲突并计数
+    let badSelect = 0;
     for (let i = 0; i < childGene.length; i++) {
-        let daytime = childGene[i];
-        let retry = CONFIG.conflictRetry;
-        let conflictArr = [];
-        let conflictIndex = conflict.check(daytime,childGene);
-        
-        while (retry > 0 && conflictIndex >= 0) {
-            conflictCount++;
-            logger.debug("cross 时间冲突 lessonindex:",i,conflictIndex);
-            conflictArr.push(conflictIndex); // 当前index不可选
-            daytime = roll(adapt,childGene,conflictArr);
-            if (daytime<0){
-                break;
-            }
-            childGene[i] = daytime;
-            retry--;
+        // let adapt = adaptability[i];
+        let check= conflict.relatedDayTime(i,childGene);
+        if(check.has(indexUtil.getDayTime(childGene[i]))){
+            badSelect ++;
         }
     }
-    logger.debug("cross 时间冲突 数量:",conflictCount)
     
-    return childGene;
+    return {childGene,badSelect};
 }
 /**
  * 变异
@@ -289,11 +280,11 @@ function cross(fatherGene,motherGene){
 function vary(geneOrder){
     for (let i = 0; i < geneOrder.length; i++) {
         if(Math.random()<CONFIG.varyRate){
-            var adapt = adaptability[i];
-            var daytime = roll(adapt,geneOrder);
-            // daytime<0说明已经没有足够的时空供选择,check()==-1说明没有动态时间冲突
-            if (daytime>=0 && conflict.check(daytime,geneOrder)==-1){ 
-                geneOrder[i] = daytime;
+            let adapt = adaptability[i];
+            let conflictSet = conflict.relatedDayTime(i,geneOrder);
+            let result = roll(adapt,geneOrder,dayTimeRoom => conflictSet.has(indexUtil.getDayTime(dayTimeRoom)));
+            if (result.index>=0 && !result.bad){
+                geneOrder[i] = result.index;
             }
         }
     }
@@ -329,10 +320,12 @@ function gaIterate(num){
             }
             let father = chromosomeSet[fatherIndex];
             let mother = chromosomeSet[motherIndex];
-            let child = cross(father.geneOrder,mother.geneOrder);
+            let badSelect = 0;
+            let result = cross(father.geneOrder,mother.geneOrder);
+            badSelect+=result.badSelect;
             // 变异
-            vary(child);
-            nextGen.push(new Chromosome(child))
+            vary(result.childGene);
+            nextGen.push(new Chromosome(result.childGene,badSelect))
         }
         chromosomeSet = nextGen;
     }
@@ -354,11 +347,24 @@ function initLessons(){
             teacherConflict[lesson.teacher].push(lessons.length-1);
             conflictArr.push(lessons.length-1);
         }
-        conflict.add(conflictArr);
+        conflict.add(conflictArr,Conflict.Scope.day,"同门课程"+lesson.id);// 同门课程不会安排在同一天
     });
     for (const key in teacherConflict) {
         const conflictArr = teacherConflict[key];
-        conflict.add(conflictArr);
+        conflict.add(conflictArr ,Conflict.Scope.time,"教师"+key);
+        // 老师的校区冲突 不能在同一个半天在不同校区开课
+        // const campusConflict = {};
+        // conflictArr.forEach(lessonIndex =>{
+        //     let lesson = lessons[lessonIndex];
+        //     if (!campusConflict[lesson.zone]){
+        //         campusConflict[lesson.zone] = [];
+        //     }
+        //     campusConflict [lesson.zone].push(lessonIndex);
+        // });
+        // for (const campus in campusConflict) {
+        //     conflict.add(campusConflict[campus] ,Conflict.Scope.halfDay,"教师"+key+" 校区"+campus);
+        // }
+        
     }
 }
 function initCaches() {
@@ -397,24 +403,18 @@ function generateChromosome(){
     // 从所有课程中随机取值 而不是从第一个开始 避免每次都是排在数组最开始位置的课程有最优先的选择，使种群的基因更丰富
     var randomIndex = new RandomIndex(adaptability.length); 
     var lessonIndex;
+    var badSelect = 0;
     while((lessonIndex=randomIndex.next())>=0){
         let adapt = adaptability[lessonIndex]
-        let index = roll(adapt,result);
-        result[lessonIndex] = index;
-        
-        // 发生冲突则重试指定次数，在防止死循环和减少冲突间保持平衡
-        let conflictArr = [];
-        let retry = CONFIG.conflictRetry;
-        let conflictIndex = conflict.check(lessonIndex,result);
-        while (retry > 0 && conflictIndex>=0) {
-            logger.debug("generateChromosome 时间冲突 lessonindex:",lessonIndex,conflictIndex);
-            conflictArr.push(index); // 当前index不可选
-            index = roll(adapt,result,conflictArr);
-            result[lessonIndex] = index;
-            retry--;
-        }
+        let conflictSet = conflict.relatedDayTime(lessonIndex,result);
+        let solution =  roll(adapt,result,roomTime => conflictSet.has(indexUtil.getDayTime(roomTime)));
+        if (solution.bad)
+            badSelect ++;
+        let dayTimeRoom = solution.index;
+        result[lessonIndex] = dayTimeRoom;
     }
-    var chromosome = new Chromosome(result);
+    var chromosome = new Chromosome(result,badSelect);
+
     return chromosome;
 }
 
@@ -472,15 +472,16 @@ function adapt(lessonIndex,day,time,roomIndex){
  * 
  * √ 同一时间片一个教师只能上一门课程
  * √ 某一教室的某一时间片只能被一门课程占用
- * √（动态时间冲突可解决这个问题，但是没有具体实现） 某班学生在某一时间片只能被安排在一个教室上课
+ * √ 某班学生在某一时间片只能被安排在一个教室上课
  * √ 某课程m必须安排在预定的时间片n上
  * √ 某教师m在时间片n时不能上课
  * √ 课程对教室的要求 
  * √ 同一课程的一次课分配在同一时段（上午/下午/晚上）
  * √ 较高的教室利用率（上课人数
  * √ 晚上/周二下午/周六尽量不排课 （这个应该是动态设置的）
- * 一周内同一门课程均匀分布 （随机数本身是均匀的，均匀分布需要动态考虑，暂时不做)
- * 同一教学班任务不要在同一天内连续的开课 这也是动态参数 暂时不做
+ * 一周内同一门课程均匀分布
+ * 同一教学班任务不要在同一天内连续的开课
+ * 老师不能在同一个半天上跨校区课
 */
 //TODO 适应度参数调整是算法的关键
 /**
@@ -514,16 +515,20 @@ var fixedCondition = [
         if (day == 6) { // 周日不排课
             return CONFIG.unable;
         }
-        if (day == 5 || time >= 8 || (day == 1 && time >= 4)) { // 晚上/周6/周二下午尽量不排课 因此降低优先级
-            return -5;
+        let val = 0;
+        if (day == 5){
+            val += -5;
+        }
+        if (time >= 8 || (day == 1 && time >= 4)) { // 晚上/周6/周二下午尽量不排课 因此降低优先级
+            val += -10;
         }
         if (time < 4) { // 早上更优先
-            return 5;
+            val += 4;
         }
         if (time < 6) { // 下午前两节优先
-            return 2;
+            val += 1;
         }
-        return 0;
+        return val;
     },
     // 课程时间需求 course timeRequire
     function(lesson,day,time,roomIndex,value){
