@@ -99,7 +99,7 @@
 /**
  * 渲染视图
  */
- var option = {
+ let option = {
     title: {
         text: '基于遗传算法的自动排课'
     },
@@ -154,7 +154,7 @@
  * addtion: 是否为最后一条数据的追加值
  */
 function draw(clear,addtion) {
-    var myChart = echarts.init(document.getElementById('chart'));
+    let myChart = echarts.init(document.getElementById('chart'));
     if (clear){
         option.legend.data.length = 0;
         option.series.length = 0;
@@ -166,7 +166,7 @@ function draw(clear,addtion) {
         option.legend.data.pop();
         option.series.pop();
     }
-    var name = 'GA'+(option.series.length);
+    let name = 'GA'+(option.series.length);
     option.legend.data.push(name);
     option.series.push({
         name,
@@ -174,9 +174,9 @@ function draw(clear,addtion) {
         large: true,
         symbolSize: 2,
         data: (function () {
-            var d = [];
-            for (var itIndex=0; itIndex<logGenData.length; itIndex++) {
-                for (var chromosomeIndex=0; chromosomeIndex<logGenData[itIndex].length; chromosomeIndex++) {
+            let d = [];
+            for (let itIndex=0; itIndex<logGenData.length; itIndex++) {
+                for (let chromosomeIndex=0; chromosomeIndex<logGenData[itIndex].length; chromosomeIndex++) {
                     d.push([itIndex, parseInt(logGenData[itIndex][chromosomeIndex])]);
                 }
             }
@@ -189,7 +189,7 @@ function draw(clear,addtion) {
     // 使用刚指定的配置项和数据显示图表。
     myChart.setOption(option);
 }
-var control = new Vue({
+let control = new Vue({
     el: '#control',
     data: {
         logLevel: logger.level+"",
@@ -224,7 +224,7 @@ var control = new Vue({
             }
         }
     }
-})
+});
 Vue.component('timetable',{
         template:`
         <div>
@@ -242,7 +242,7 @@ Vue.component('timetable',{
             table:Array
         },
     });
-var tables = new Vue({
+let tables = new Vue({
     el: '#tables',
     data: {
         lessonFormat : lessonFormat,
@@ -296,7 +296,7 @@ var tables = new Vue({
                     table.push({time:time+1})
                 }
                 return table;
-            })()
+            })();
             // timetable: [ {time:1,0:"课程1",1:"课程1",2:"课程1",3:"课程1",4:"课程1",5:"课程1",6:"课程1"},
             for (let lessonIndex = 0; lessonIndex < gene.length; lessonIndex++) {
                 let pos = indexUtil.getPosition(gene[lessonIndex]);
