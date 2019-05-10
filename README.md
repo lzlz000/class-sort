@@ -263,7 +263,13 @@ function generateChromosome(){
 
 然后便进入了遗传算法迭代的部分，目的是找出适应度的倒数尽可能最大结果。首先 初始化 n个染色体，这n个染色体（排课结果集）就是遗传算法中的“种群”，以此为基础进行迭代
 
-染色体类
+
+
+##### 动态适应度
+
+上述适应度概率数组解决了静态约束的问题，每轮迭代的交叉变异还会引入新的冲突不满足**约束条件2、3**，原先我尝试通过严格的检查来确保不会发生此情况，但是带来的问题是得到的解相对较差，效率低下。因此定义动态适应度解决动态冲突问题，上文中我们已经建立了和每节排课关联的**约束组**，从每个约束组中计算是否存在时间冲突的情况，每个冲突记为一个 **坏选择**,在计算适应度的时候，根据坏选择数量进行扣分，这样冲突较多的染色体便不再优秀。这个扣分策略目前采用简单的 数量*分数 的方式，分数可配置。
+
+染色体代码
 
 ```javascript
 /**
@@ -284,7 +290,7 @@ function Chromosome(geneOrder,badSelect){
             const spaceTimeIndex = geneOrder[lessonIndex];
             this.adapt += adaptability[lessonIndex][spaceTimeIndex];
         }
-        this.adapt -= badSelect *CONFIG.badSelectVal;
+        this.adapt -= badSelect *CONFIG.badSelectVal; 
     }
     _setGeneOrder(geneOrder);
 }
@@ -311,42 +317,94 @@ $$
 
 
 
-##### 交叉 & 变异
+##### 交叉
 
 经过上述步骤获得的染色体集合，对他们随机选择两组进行交叉
 
-交叉是算法的难点之一，因为染色体的生成满足了很多的约束条件，交叉会破坏这些约束条件，但是不通过这个步骤又无法获得更优的结果。
-
-我来说明对约束条件的解决方案
-
-例如
-父基因 [1,2,9,4,7,6,8,5]
-母基因 [1,3,2,4,5,6,7,8]
-子基因随机从两边获取
-子基因 [1,2,2,4,7,6,7,8]
-则获得了不可用的基因序列 因为违反了上述**约束条件1**
-因此我们定义一个“**相关基因**”的概念：
-在上述例子中
-父母基因存在两对相关基因 2,9--3,2 7,8,5--5,7,8 相关基因必须当做一个基因做整体的调整
-对应数组中的索引位置为 (2,3) (4,6,8)
-上述父母基因可以表示为关联基因的形式,数组中存储的是下标
- relatedGene = [[0],[1,2],[3],[4,6,8],[5]] 相关基因作为一个整体只能被一起选择或不选。
+交叉是算法的难点之一，因为染色体的生成满足了很多的约束条件，交叉会破坏这些约束条件，但是不通过这个步骤又无法获得更优的结果，总结其规律我定义了一个**关联基因**来解决问题。
 
 这个步骤比较麻烦我画图说明：
 
+![157472239275](.img/1557472239275.png)
 
+整体流程代码如下：
 
-#### 整体流程
+```js
+var childGene = [];// 以父基因为基础添加母基因来实现交叉
+var set = new Set(); // 用于保存已经关联的基因
+var relatedGenes = []; //关联基因的索引
+// 遍历寻找关联基因
+for (let i = 0; i < fatherGene.length; i++) {
+    if(set.has(i))
+        continue;
+    let gene = motherGene[i];
+    let point = fatherGene.indexOf(gene);
+    let related = [i];
+    // 当父基因组中存相同的基因且不是初始索引位置
+    // 关联基因寻找完成的标志为：
+    // 1 形成闭环  例如 [1,2,3] 和 [2,3,1]
+    // 2 不再存在相同的基因  例如 [1,2,3] 和 [2,3,5]
+    while (point >=0 && point!=i) { 
+        gene = motherGene[point];
+        set.add(point);
+        related.push(point);
+        point = fatherGene.indexOf(gene);
+    }
+    relatedGenes.push(related);
+}
+for (let i = 0; i < relatedGenes.length; i++) {
+    let releted = relatedGenes[i];
+    let fromFather = Math.random()<0.5?true:false;
 
+    for (let j = 0; j < releted.length; j++) {
+        let index = releted[j];
+        childGene[index] = fromFather? fatherGene[index]: motherGene[index];
+    }
+}
+return childGene;
+```
 
+##### 变异
 
-### 工程化
-```java
-interface ArrangeAdaptFunction {
-    /** 传入一个染色体 返回其适应度值 */
-    int adapt(Chromosome data);
+变异是一个增加种群丰富程度的方式，但不能概率过高，一个较低的变异概率可以增加种群丰富程度，提高得到解的适应度，较高的变异概率会埋没掉优秀的基因，变异概率的参数也是可配置的。
+
+```js
+/**
+ * 变异
+ * @param {number[]} geneOrder 基因序列
+ */
+function vary(geneOrder){
+    for (let i = 0; i < geneOrder.length; i++) {
+        // CONFIG.varyRate 为变异概率，经过不断测试，我设置为了0.05
+        if(Math.random()<CONFIG.varyRate){
+            let adapt = adaptability[i];
+            // 获得该基因对应的约束组
+            let conflictSet = conflict.relatedDayTime(i,geneOrder);
+            // 轮盘赌获得新的基因，通过坏选择过滤的方式让冲突基因被选择的概率降到极低
+            let result = roll(adapt,geneOrder,dayTimeRoom => 	
+                              conflictSet.has(indexUtil.getDayTime(dayTimeRoom)));
+            if (result>=0) {
+                geneOrder[i] = result;
+            }
+        }
+    }
 }
 ```
 
-### 后续优化
+#### 整体流程
+
+![](.img/flow.png)
+
+### 工程化
+
+排课算法是一个相对比较复杂的，后续优化调整可能会比较频繁的内容。在对demo进行工程化的时候， 充分考虑到各种情况，要抽象其核心内容，定义好数据出入的接口，参数配置统一配置，让使用者适配该工具而不是去适配业务数据。
+
+1. 充分遵循面向对象的编程原则，尽量实现面向接口编程，方便替换修改，尤其是在一些可能经常需要优化的地方，例如适应度函数，淘汰策略，染色体动态适应度值的扣减等。尽量使用一些类似策略模式或者模板方法模式的方式（这个说着轻巧，难度很大）
+2. 充分利用java语言的特性，让整体逻辑更加清晰，暴露出简单的接口面向使用者。
+3. 充分利用缓存和多线程机制，提高算法运行效率
+4. 适配分布式环境
+
+
+
+
 
