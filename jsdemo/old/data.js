@@ -10,15 +10,14 @@
 // courses {id:10001, name:'游戏设计', weekHour:4, totalHour:34, roomType:RoomType.NORMAL, onceHour:2, timeRequire:null}
 // teacher {id:20002, name:'教师2', disableTime: '30304'}
 // class {id:30101, course:10001, teacher:20001, studentNum:28, zone:Zone.SP},
-var campus = {0:'SP',1:'JD'};
 var DataGenerator = function(){
     var Param = {
-        campus,
+        campus:[0,1],
         buildings : [
             {
                 roomTypeId :0,
                 roomType : 'normal',
-                zone: 0,
+                zone:0,
                 capacityNum:{ // 容量数量
                     50: 15,
                     100: 8,
@@ -36,7 +35,7 @@ var DataGenerator = function(){
             },{
                 roomTypeId :3,
                 roomType : 'lab',
-                zone:0,
+                zone: 0,
                 capacityNum:{ // 容量数量
                     50: 2,
                 }
@@ -56,6 +55,7 @@ var DataGenerator = function(){
                 onceHour: 2,
                 weekHour: 4,
                 count: 50,
+                classes
             },
             B:{
                 roomType: 'normal',
@@ -122,7 +122,7 @@ var DataGenerator = function(){
                         id: 10000+lessons.length,
                         name: '课程'+letterIndex(lessons.length),
                         weekHour: course.weekHour,
-                        roomType: course.roomTypeId,
+                        roomType: course.roomType,
                         onceHour: course.onceHour
                     });
                 }
@@ -197,7 +197,7 @@ function coverData(data){
         data = new DataGenerator();
     data.generate();
     buildings = data.buildings;
-    lessonClasses = data.classes;
+    classes = data.classes;
     classRooms = data.classrooms;
     teachers = data.teachers;
     courses = data.lessons;
